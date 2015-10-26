@@ -49,13 +49,23 @@ static SDL_Texture *load_png_texture(sdl_context_t *ctx, char *path) {
 	return texture;
 }
 
+typedef struct {
+	int row;
+	int col;
+} cell_pos_t;
+
+static cell_pos_t cell_pos(int row, int col) {
+	cell_pos_t result = {row, col};
+	return result;
+}
+
 typedef enum { PIECE_RED, PIECE_WHITE } piece_color_t;
+
 typedef struct {
 	piece_color_t color;
 	bool captured;
 	bool king;
-	int row;
-	int col;
+	cell_pos_t pos;
 } piece_t;
 
 static void advance_board_row_col(int *row, int *col) {
@@ -68,20 +78,30 @@ static void advance_board_row_col(int *row, int *col) {
 }
 
 typedef struct {
-	int row;
-	int col;
-} piece_pos_t;
+	cell_pos_t pos;
+	piece_t *capture;
+} move_t;
 
 typedef struct {
-	piece_pos_t moves[4];
+	move_t moves[4];
 	int count;
 } piece_moves_t;
+
+static float lerp(float a, float b, float t) {
+	return (1-t)*a + t*b;
+}
 
 static sdl_context_t sdl;
 static piece_t pieces[24];
 static piece_t *board[8][8];
 static piece_t *selected_piece;
-static piece_moves_t available_moves;
+static piece_moves_t available_moves; // moves for the selected piece
+
+// Piece move animation
+static piece_t *animating_piece;
+static piece_t *animating_capture;
+static cell_pos_t animating_from;
+static float animating_t;
 
 static int window_width;
 static int window_height;
@@ -93,6 +113,13 @@ static int board_size;
 static int board_hor_padding;
 static int cell_size;
 static SDL_Rect cell_rects[32];
+
+static void cell_to_rect(cell_pos_t cell, SDL_Rect *rect) {
+	rect->x = board_hor_padding + (cell.col * cell_size);
+	rect->y = board_ver_padding + (cell.row * cell_size);
+	rect->w = cell_size;
+	rect->h = cell_size;
+}
 
 static void window_resized(int width, int height) {
 	window_width = width;
@@ -118,25 +145,37 @@ static void window_resized(int width, int height) {
 	}
 }
 
-static void test_move(piece_moves_t *moves, piece_t *piece, int row_dir, int col_dir) {
-	int new_row = piece->row + row_dir,
-		new_col = piece->col + col_dir;
-	if (new_row >= 0 && new_row < 8 &&
-		new_col >= 0 && new_col < 8 &&
-		!board[new_row][new_col]
-	) {
-		moves->moves[moves->count].row = new_row;
-		moves->moves[moves->count].col = new_col;
-		moves->count++;
+static bool valid_cell(cell_pos_t pos) {
+	return (pos.row >= 0 && pos.row < 8) && (pos.col >= 0 && pos.col < 8);
+}
+
+static void find_move(piece_moves_t *moves, piece_t *piece, int row_dir, int col_dir) {
+	cell_pos_t cur_pos = piece->pos;
+	cell_pos_t move_pos = cell_pos(cur_pos.row + row_dir, cur_pos.col + col_dir);
+	cell_pos_t cap_pos = cell_pos(move_pos.row + row_dir, move_pos.col + col_dir);
+	if (valid_cell(move_pos)) {
+		piece_t *other = board[move_pos.row][move_pos.col];
+		if (other) {
+			if (valid_cell(cap_pos) &&
+				other->color != piece->color &&
+				!board[cap_pos.row][cap_pos.col]
+			) {
+				move_t move = { cap_pos, other };
+				moves->moves[moves->count++] = move;
+			}
+		} else {
+			move_t move = { move_pos, 0 };
+			moves->moves[moves->count++] = move;
+		}
 	}
 }
 
 piece_moves_t get_moves_for_piece(piece_t *piece) {
 	piece_moves_t result = {};
-	test_move(&result, piece, 1, 1);
-	test_move(&result, piece, -1, 1);
-	test_move(&result, piece, 1, -1);
-	test_move(&result, piece, -1, -1);
+	find_move(&result, piece, 1, 1);
+	find_move(&result, piece, -1, 1);
+	find_move(&result, piece, 1, -1);
+	find_move(&result, piece, -1, -1);
 	return result;
 }
 
@@ -169,31 +208,37 @@ int main(int argc, char **argv) {
 	window_resized(window_width, window_height);
 
 	// Init board state
-	int row = 0;
-	int col = 0;
+	int fill_row = 0;
+	int fill_col = 0;
 
 	for (int i = 0; i < 12; i++) {
 		piece_t *piece = pieces + i;
 		piece->color = PIECE_WHITE;
-		piece->row = row;
-		piece->col = col;
-		board[row][col] = piece;
-		advance_board_row_col(&row, &col);
+		piece->pos = cell_pos(fill_row, fill_col);
+		board[fill_row][fill_col] = piece;
+		advance_board_row_col(&fill_row, &fill_col);
 	}
 
-	row = 5;
-	col = 1;
+	fill_row = 5;
+	fill_col = 1;
 	for (int i = 12; i < 24; i++) {
 		piece_t *piece = pieces + i;
 		piece->color = PIECE_RED;
-		piece->row = row;
-		piece->col = col;
-		board[row][col] = piece;
-		advance_board_row_col(&row, &col);
+		piece->pos = cell_pos(fill_row, fill_col);
+		board[fill_row][fill_col] = piece;
+		advance_board_row_col(&fill_row, &fill_col);
 	}
 
 	bool running = true;
+	int last_time = SDL_GetTicks();
 	while (running) {
+		int current_time = SDL_GetTicks();
+		int ellapsed_ms = current_time - last_time;
+		last_time = current_time;
+
+		float dt = (float)ellapsed_ms / 1000.0f;
+		// printf("%f\n", dt);
+
 		SDL_Event event = {};
 		while (SDL_PollEvent(&event)) {
 			switch (event.type) {
@@ -207,16 +252,49 @@ int main(int argc, char **argv) {
 				} break;
 				case SDL_MOUSEBUTTONDOWN: {
 					if (event.button.state == SDL_PRESSED && event.button.button == SDL_BUTTON_LEFT) {
+						if (animating_piece)
+							break;
+
 						int x = event.button.x * dpi_rate,
 							y = event.button.y * dpi_rate;
+
 						if ((x > board_hor_padding && x <= board_hor_padding + board_size) &&
 							(y > board_ver_padding && y <= board_ver_padding + board_size)) {
-							int col = (x - board_hor_padding) / cell_size,
-								row = (y - board_ver_padding) / cell_size;
-							if (board[row][col]) {
-								selected_piece = board[row][col];
+							cell_pos_t click_pos = {
+								(y - board_ver_padding) / cell_size,
+								(x - board_hor_padding) / cell_size
+							};
+							// printf("click %d %d\n", click_pos.row, click_pos.col);
+
+							if (board[click_pos.row][click_pos.col]) {
+								selected_piece = board[click_pos.row][click_pos.col];
 								available_moves = get_moves_for_piece(selected_piece);
 								// printf("selected_piece: %p\n", selected_piece);
+							} else if (selected_piece) {
+								move_t *move = 0;
+								for (int i = 0; i < available_moves.count; i++) {
+									move_t *test = available_moves.moves + i;
+									if (test->pos.row == click_pos.row && test->pos.col == click_pos.col) {
+										move = test;
+										break;
+									}
+								}
+								if (move) {
+									animating_piece = selected_piece;
+									animating_from = selected_piece->pos;
+
+									board[selected_piece->pos.row][selected_piece->pos.col] = 0;
+									board[move->pos.row][move->pos.col] = selected_piece;
+									selected_piece->pos = move->pos;
+									if (move->capture) {
+										animating_capture = move->capture;
+										board[animating_capture->pos.row][animating_capture->pos.col] = 0;
+										animating_capture->captured = true;
+									}
+
+									animating_t = 0;
+									selected_piece = 0;
+								}
 							}
 						}
 					}
@@ -235,35 +313,63 @@ int main(int argc, char **argv) {
 
 		if (selected_piece) {
 			SDL_Rect rect = {};
-			rect.x = board_hor_padding + (selected_piece->col * cell_size);
-			rect.y = board_ver_padding + (selected_piece->row * cell_size);
-			rect.w = cell_size;
-			rect.h = cell_size;
+			cell_to_rect(selected_piece->pos, &rect);
 			SDL_SetRenderDrawColor(sdl.renderer, 128, 128, 255, 128);
 			SDL_RenderFillRect(sdl.renderer, &rect);
 			for (int i = 0; i < available_moves.count; i++) {
-				piece_pos_t pos = available_moves.moves[i];
-				rect.x = board_hor_padding + (pos.col * cell_size);
-				rect.y = board_ver_padding + (pos.row * cell_size);
-				rect.w = cell_size;
-				rect.h = cell_size;
+				cell_pos_t pos = available_moves.moves[i].pos;
+				cell_to_rect(pos, &rect);
 				SDL_RenderFillRect(sdl.renderer, &rect);
+			}
+		}
+
+		if (animating_piece) {
+			animating_t += dt * 3;
+
+			if (animating_t >= 1.0) {
+				animating_piece = 0;
+				animating_capture = 0;
+				animating_t = 0;
+			} else {
+				if (animating_capture) {
+					SDL_Rect rect;
+					cell_to_rect(animating_capture->pos, &rect);
+					SDL_Texture *texture = (animating_capture->color == PIECE_RED) ? sdl.red_piece : sdl.white_piece;
+					SDL_SetTextureAlphaMod(texture, (Uint8)((1 - animating_t) * 255));
+					SDL_RenderCopy(sdl.renderer, texture, 0, &rect);
+					SDL_SetTextureAlphaMod(texture, 255);
+				}
+
+				SDL_Rect from_rect = {};
+				SDL_Rect to_rect = {};
+				cell_to_rect(animating_from, &from_rect);
+				cell_to_rect(animating_piece->pos, &to_rect);
+
+				SDL_Rect lerp_rect;
+				lerp_rect.x = (int)lerp(from_rect.x, to_rect.x, animating_t);
+				lerp_rect.y = (int)lerp(from_rect.y, to_rect.y, animating_t);
+				lerp_rect.w = cell_size;
+				lerp_rect.h = cell_size;
+
+				SDL_RenderCopy(
+					sdl.renderer,
+					(animating_piece->color == PIECE_RED) ? sdl.red_piece : sdl.white_piece,
+					0, &lerp_rect
+				);
 			}
 		}
 
 		for (int i = 0; i < ARRAY_SIZE(pieces); i++) {
 			piece_t *piece = pieces + i;
-			if (!piece->captured) {
+			if (!piece->captured && piece != animating_piece) {
 				SDL_Rect rect = {};
-				rect.x = board_hor_padding + (piece->col * cell_size);
-				rect.y = board_ver_padding + (piece->row * cell_size);
-				rect.h = cell_size;
-				rect.w = cell_size;
-				if (piece->color == PIECE_RED) {
-					SDL_RenderCopy(sdl.renderer, sdl.red_piece, 0, &rect);
-				} else {
-					SDL_RenderCopy(sdl.renderer, sdl.white_piece, 0, &rect);
-				}
+				cell_to_rect(piece->pos, &rect);
+
+				SDL_RenderCopy(
+					sdl.renderer,
+					(piece->color == PIECE_RED) ? sdl.red_piece : sdl.white_piece,
+					0, &rect
+				);
 			}
 		}
 
