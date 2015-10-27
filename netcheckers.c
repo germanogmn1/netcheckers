@@ -9,7 +9,10 @@ typedef struct {
 	SDL_Window *window;
 	SDL_Renderer *renderer;
 	SDL_Texture *red_piece;
+	SDL_Texture *red_piece_king;
 	SDL_Texture *white_piece;
+	SDL_Texture *white_piece_king;
+	SDL_Texture *highlight;
 } sdl_context_t;
 
 static void sdl_cleanup(sdl_context_t *ctx) {
@@ -59,6 +62,7 @@ static cell_pos_t cell_pos(int row, int col) {
 	return result;
 }
 
+// red pieces start at bottom side of the board, whites at top
 typedef enum { PIECE_RED, PIECE_WHITE } piece_color_t;
 
 typedef struct {
@@ -92,10 +96,14 @@ static float lerp(float a, float b, float t) {
 }
 
 static sdl_context_t sdl;
+
+static piece_color_t turn;
 static piece_t pieces[24];
 static piece_t *board[8][8];
 static piece_t *selected_piece;
 static piece_moves_t available_moves; // moves for the selected piece
+static piece_t *must_capture[10];
+static int must_capture_count;
 
 // Piece move animation
 static piece_t *animating_piece;
@@ -119,6 +127,13 @@ static void cell_to_rect(cell_pos_t cell, SDL_Rect *rect) {
 	rect->y = board_ver_padding + (cell.row * cell_size);
 	rect->w = cell_size;
 	rect->h = cell_size;
+}
+
+static SDL_Texture *texture_for_piece(piece_t *piece) {
+	if (piece->color == PIECE_RED)
+		return piece->king ? sdl.red_piece_king : sdl.red_piece;
+	else
+		return piece->king ? sdl.white_piece_king : sdl.white_piece;
 }
 
 static void window_resized(int width, int height) {
@@ -172,11 +187,107 @@ static void find_move(piece_moves_t *moves, piece_t *piece, int row_dir, int col
 
 piece_moves_t get_moves_for_piece(piece_t *piece) {
 	piece_moves_t result = {};
-	find_move(&result, piece, 1, 1);
-	find_move(&result, piece, -1, 1);
-	find_move(&result, piece, 1, -1);
-	find_move(&result, piece, -1, -1);
+
+	if (piece->color == PIECE_WHITE || piece->king) {
+		find_move(&result, piece, 1, 1);
+		find_move(&result, piece, 1, -1);
+	}
+	if (piece->color == PIECE_RED || piece->king) {
+		find_move(&result, piece, -1, 1);
+		find_move(&result, piece, -1, -1);
+	}
+
+	bool has_capture = false;
+	for (int i = 0; i < result.count; i++) {
+		if (result.moves[i].capture) {
+			has_capture = true;
+			break;
+		}
+	}
+
+	if (has_capture) {
+		int new_count = 0;
+		for (int i = 0; i < result.count; i++) {
+			if (result.moves[i].capture) {
+				result.moves[new_count++] = result.moves[i];
+			}
+		}
+		result.count = new_count;
+	}
+
 	return result;
+}
+
+void clicked_cell(cell_pos_t pos) {
+	piece_t *clicked_piece = board[pos.row][pos.col];
+	if (clicked_piece && clicked_piece->color == turn) {
+		bool piece_can_move = true;
+		if (must_capture_count) {
+			piece_can_move = false;
+			for (int i = 0; i < must_capture_count; i++) {
+				if (must_capture[i] == clicked_piece) {
+					piece_can_move = true;
+					break;
+				}
+			}
+		}
+		piece_moves_t moves = get_moves_for_piece(clicked_piece);
+		if (piece_can_move && moves.count) {
+			selected_piece = clicked_piece;
+			available_moves = moves;
+		}
+		// printf("selected_piece: %p\n", selected_piece);
+	} else if (selected_piece) {
+		move_t *move = 0;
+		for (int i = 0; i < available_moves.count; i++) {
+			move_t *test = available_moves.moves + i;
+			if (test->pos.row == pos.row && test->pos.col == pos.col) {
+				move = test;
+				break;
+			}
+		}
+		if (move) {
+			animating_piece = selected_piece;
+			animating_from = selected_piece->pos;
+			animating_t = 0;
+
+			board[selected_piece->pos.row][selected_piece->pos.col] = 0;
+			board[move->pos.row][move->pos.col] = selected_piece;
+			selected_piece->pos = move->pos;
+			if ((selected_piece->color == PIECE_RED && move->pos.row == 0) ||
+				(selected_piece->color == PIECE_WHITE && move->pos.row == 7)
+			) {
+				selected_piece->king = true;
+			}
+
+			bool end_turn = true;
+			if (move->capture) {
+				animating_capture = move->capture;
+				board[animating_capture->pos.row][animating_capture->pos.col] = 0;
+				animating_capture->captured = true;
+
+				available_moves = get_moves_for_piece(selected_piece);
+				if (available_moves.count > 0 && available_moves.moves[0].capture) {
+					end_turn = false;
+				}
+			}
+			if (end_turn) {
+				selected_piece = 0;
+				turn = (turn == PIECE_RED) ? PIECE_WHITE : PIECE_RED;
+			}
+
+			must_capture_count = 0;
+			for (int i = 0; i < 32; i++) {
+				piece_t *piece = pieces + i;
+				if (piece->color == turn && !piece->captured) {
+					piece_moves_t moves = get_moves_for_piece(piece);
+					if (moves.count && moves.moves[0].capture) {
+						must_capture[must_capture_count++] = piece;
+					}
+				}
+			}
+		}
+	}
 }
 
 int main(int argc, char **argv) {
@@ -203,7 +314,10 @@ int main(int argc, char **argv) {
 		sdl_error(&sdl, "SDL_CreateRenderer");
 
 	sdl.red_piece = load_png_texture(&sdl, "piece_red.png");
+	sdl.red_piece_king = load_png_texture(&sdl, "piece_red_king.png");
 	sdl.white_piece = load_png_texture(&sdl, "piece_white.png");
+	sdl.white_piece_king = load_png_texture(&sdl, "piece_white_king.png");
+	sdl.highlight = load_png_texture(&sdl, "highlight.png");
 
 	window_resized(window_width, window_height);
 
@@ -229,6 +343,8 @@ int main(int argc, char **argv) {
 		advance_board_row_col(&fill_row, &fill_col);
 	}
 
+	turn = PIECE_RED;
+
 	bool running = true;
 	int last_time = SDL_GetTicks();
 	while (running) {
@@ -251,6 +367,26 @@ int main(int argc, char **argv) {
 					}
 				} break;
 				case SDL_MOUSEBUTTONDOWN: {
+					// DEBUG remove piece with right click
+					if (event.button.state == SDL_PRESSED && event.button.button == SDL_BUTTON_RIGHT) {
+						int x = event.button.x * dpi_rate,
+							y = event.button.y * dpi_rate;
+
+						if ((x > board_hor_padding && x <= board_hor_padding + board_size) &&
+							(y > board_ver_padding && y <= board_ver_padding + board_size)) {
+							cell_pos_t p = {
+								(y - board_ver_padding) / cell_size,
+								(x - board_hor_padding) / cell_size
+							};
+							piece_t * piece = board[p.row][p.col];
+							if (piece) {
+								piece->captured = true;
+								board[p.row][p.col] = 0;
+								selected_piece = 0;
+							}
+						}
+					}
+
 					if (event.button.state == SDL_PRESSED && event.button.button == SDL_BUTTON_LEFT) {
 						if (animating_piece)
 							break;
@@ -264,38 +400,7 @@ int main(int argc, char **argv) {
 								(y - board_ver_padding) / cell_size,
 								(x - board_hor_padding) / cell_size
 							};
-							// printf("click %d %d\n", click_pos.row, click_pos.col);
-
-							if (board[click_pos.row][click_pos.col]) {
-								selected_piece = board[click_pos.row][click_pos.col];
-								available_moves = get_moves_for_piece(selected_piece);
-								// printf("selected_piece: %p\n", selected_piece);
-							} else if (selected_piece) {
-								move_t *move = 0;
-								for (int i = 0; i < available_moves.count; i++) {
-									move_t *test = available_moves.moves + i;
-									if (test->pos.row == click_pos.row && test->pos.col == click_pos.col) {
-										move = test;
-										break;
-									}
-								}
-								if (move) {
-									animating_piece = selected_piece;
-									animating_from = selected_piece->pos;
-
-									board[selected_piece->pos.row][selected_piece->pos.col] = 0;
-									board[move->pos.row][move->pos.col] = selected_piece;
-									selected_piece->pos = move->pos;
-									if (move->capture) {
-										animating_capture = move->capture;
-										board[animating_capture->pos.row][animating_capture->pos.col] = 0;
-										animating_capture->captured = true;
-									}
-
-									animating_t = 0;
-									selected_piece = 0;
-								}
-							}
+							clicked_cell(click_pos);
 						}
 					}
 				} break;
@@ -310,6 +415,14 @@ int main(int argc, char **argv) {
 
 		SDL_Rect outline = {board_hor_padding-1, board_ver_padding-1, board_size+1, board_size+1};
 		SDL_RenderDrawRect(sdl.renderer, &outline);
+
+		if (must_capture_count) {
+			for (int i = 0; i < must_capture_count; i++) {
+				SDL_Rect rect = {};
+				cell_to_rect(must_capture[i]->pos, &rect);
+				SDL_RenderCopy(sdl.renderer, sdl.highlight, 0, &rect);
+			}
+		}
 
 		if (selected_piece) {
 			SDL_Rect rect = {};
@@ -334,7 +447,7 @@ int main(int argc, char **argv) {
 				if (animating_capture) {
 					SDL_Rect rect;
 					cell_to_rect(animating_capture->pos, &rect);
-					SDL_Texture *texture = (animating_capture->color == PIECE_RED) ? sdl.red_piece : sdl.white_piece;
+					SDL_Texture *texture = texture_for_piece(animating_capture);
 					SDL_SetTextureAlphaMod(texture, (Uint8)((1 - animating_t) * 255));
 					SDL_RenderCopy(sdl.renderer, texture, 0, &rect);
 					SDL_SetTextureAlphaMod(texture, 255);
@@ -350,12 +463,7 @@ int main(int argc, char **argv) {
 				lerp_rect.y = (int)lerp(from_rect.y, to_rect.y, animating_t);
 				lerp_rect.w = cell_size;
 				lerp_rect.h = cell_size;
-
-				SDL_RenderCopy(
-					sdl.renderer,
-					(animating_piece->color == PIECE_RED) ? sdl.red_piece : sdl.white_piece,
-					0, &lerp_rect
-				);
+				SDL_RenderCopy(sdl.renderer, texture_for_piece(animating_piece), 0, &lerp_rect);
 			}
 		}
 
@@ -364,12 +472,7 @@ int main(int argc, char **argv) {
 			if (!piece->captured && piece != animating_piece) {
 				SDL_Rect rect = {};
 				cell_to_rect(piece->pos, &rect);
-
-				SDL_RenderCopy(
-					sdl.renderer,
-					(piece->color == PIECE_RED) ? sdl.red_piece : sdl.white_piece,
-					0, &rect
-				);
+				SDL_RenderCopy(sdl.renderer, texture_for_piece(piece), 0, &rect);
 			}
 		}
 
