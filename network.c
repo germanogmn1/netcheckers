@@ -8,7 +8,13 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 
+typedef enum {
+	MSG_CLOSE,
+	MSG_STR,
+} message_type_t;
+
 typedef struct {
+	message_type_t type;
 	char str[256];
 } message_t;
 
@@ -79,6 +85,10 @@ static int start_server(char *port) {
 		return -1;
 	}
 	printf("Connected with client\n");
+	if (close(sockd) == -1) {
+		perror("ERROR: close");
+		return 1;
+	}
 	return nsockd;
 }
 
@@ -127,14 +137,24 @@ static int recv_thread_proc(void *data) {
 			perror("ERROR: read socket");
 			return 1;
 		}
-		if (buffer[rc - 1]) {
-			fprintf(stderr, "ERROR: received message isn't null terminated\n");
-			return 1;
-		}
 		message_t msg = {};
-		strcpy(msg.str, buffer);
+		if (rc == 0) {
+			msg.type = MSG_CLOSE;
+		} else {
+			if (buffer[rc - 1]) {
+				fprintf(stderr, "ERROR: received message isn't null terminated\n");
+				return 1;
+			}
+			msg.type = MSG_STR;
+			strcpy(msg.str, buffer);
+		}
 		enqueue(ctx.queue, &msg);
+
+		if (msg.type == MSG_CLOSE) {
+			break;
+		}
 	}
+	// printf("DEBUG exited recv_thread_proc\n");
 	return 0;
 }
 
@@ -142,37 +162,27 @@ static int send_thread_proc(void *data) {
 	struct thread_ctx ctx = *((struct thread_ctx*)data);
 	message_t msg;
 	for (;;) {
-		if (ctx.queue->count) {
-			dequeue(ctx.queue, &msg);
-			int msg_len = strlen(msg.str) + 1;
-			int wc = write(ctx.sock, msg.str, msg_len);
-			if (wc == -1) {
-				perror("ERROR: write socket");
-				return 1;
-			} else if (wc != msg_len) {
-				fprintf(stderr, "ERROR: write failed to write all bytes\n");
-				return 1;
+		if (dequeue(ctx.queue, &msg)) {
+			if (msg.type == MSG_CLOSE) {
+				break;
+			} else if (msg.type == MSG_STR) {
+				int msg_len = strlen(msg.str) + 1;
+				int wc = write(ctx.sock, msg.str, msg_len);
+				if (wc == -1) {
+					perror("ERROR: write socket");
+					return 1;
+				} else if (wc != msg_len) {
+					fprintf(stderr, "ERROR: write failed to write all bytes\n");
+					return 1;
+				}
 			}
 		} else {
 			SDL_Delay(50);
 		}
 	}
+	// printf("DEBUG exited send_thread_proc\n");
 	return 0;
 }
-
-#if 0
-static int server_thread(void *ptr) {
-	if (close(nsockd) == -1) {
-		perror("ERROR: close socket from accept");
-		return 1;
-	}
-	if (close(sockd) == -1) {
-		perror("ERROR: close socket");
-		return 1;
-	}
-	return 0;
-}
-#endif
 
 void exit_usage(char *script) {
 	fprintf(stderr,
@@ -223,21 +233,38 @@ int main(int argc, char **argv) {
 			send = false;
 
 			printf("> ");
-			scanf("%255s", msg.str);
+			fgets(msg.str, 255, stdin);
+			msg.str[strlen(msg.str) - 1] = 0; // remove newline
+			if (strcmp(msg.str, "!close") == 0) {
+				msg.type = MSG_CLOSE;
+			} else {
+				msg.type = MSG_STR;
+			}
 			enqueue(&send_queue, &msg);
-			printf("ok\n");
+			if (msg.type == MSG_CLOSE) {
+				if (shutdown(sockd, SHUT_RDWR) == -1) {
+					perror("ERROR: shutdown");
+					return 1;
+				}
+				break;
+			}
 		} else {
 			send = true;
 
-			printf("recv: ");
-			fflush(stdout);
-			while (!recv_queue.count) {
+			while (!dequeue(&recv_queue, &msg)) {
 				SDL_Delay(50);
 			}
-			dequeue(&recv_queue, &msg);
-			printf("%s\n", msg.str);
+			if (msg.type == MSG_STR) {
+				printf("MSG_STR: %s\n", msg.str);
+			} else if (msg.type == MSG_CLOSE) {
+				enqueue(&send_queue, &msg);
+				printf("Connection closed by %s\n", server ? "client" : "server");
+				break;
+			}
 		}
 	}
+
+	printf("Exiting...\n");
 
 	int thread_res;
 	SDL_WaitThread(recv_thread, &thread_res);
@@ -246,4 +273,9 @@ int main(int argc, char **argv) {
 	SDL_WaitThread(send_thread, &thread_res);
 	if (thread_res)
 		fprintf(stderr, "sender thread exit with error\n");
+
+	if (close(sockd) == -1) {
+		perror("ERROR: close");
+		return 1;
+	}
 }
