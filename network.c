@@ -5,18 +5,9 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
-#include <stdbool.h>
 #include <SDL2/SDL.h>
 
-typedef enum {
-	MSG_CLOSE,
-	MSG_STR,
-} message_type_t;
-
-typedef struct {
-	message_type_t type;
-	char str[256];
-} message_t;
+#include "network.h"
 
 #define QUEUE_SIZE 64
 typedef struct {
@@ -61,7 +52,7 @@ static bool dequeue(queue_t *queue, message_t *message) {
 static int start_server(char *port) {
 	int sockd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockd == -1) {
-		perror("ERROR: create socket");
+		perror("ERROR create socket");
 		return -1;
 	}
 	struct sockaddr_in addr;
@@ -75,18 +66,18 @@ static int start_server(char *port) {
 		return -1;
 	}
 	if (listen(sockd, 1) == -1) {
-		perror("ERROR: listen");
+		perror("ERROR listen");
 		return -1;
 	}
 	printf("Waiting for connections on port %s...\n", port);
 	int nsockd = accept(sockd, 0, 0);
 	if (nsockd == -1) {
-		perror("ERROR: accept");
+		perror("ERROR accept");
 		return -1;
 	}
 	printf("Connected with client\n");
 	if (close(sockd) == -1) {
-		perror("ERROR: close");
+		perror("ERROR close");
 		return 1;
 	}
 	return nsockd;
@@ -108,13 +99,13 @@ static int start_client(char *host, char *port) {
 
 	int sockd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockd == -1) {
-		perror("ERROR: create socket");
+		perror("ERROR create socket");
 		freeaddrinfo(info);
 		return -1;
 	}
 	printf("Connecting with server %s at port %s...\n", host, port);
 	if (connect(sockd, info->ai_addr, info->ai_addrlen) == -1) {
-		perror("ERROR: connect");
+		perror("ERROR connect");
 		freeaddrinfo(info);
 		return -1;
 	}
@@ -123,18 +114,21 @@ static int start_client(char *host, char *port) {
 	return sockd;
 }
 
-struct thread_ctx {
-	queue_t *queue;
+struct _net_state {
 	int sock;
+	queue_t recv_queue;
+	SDL_Thread *recv_thread;
+	queue_t send_queue;
+	SDL_Thread *send_thread;
 };
 
 static int recv_thread_proc(void *data) {
-	struct thread_ctx ctx = *((struct thread_ctx*)data);
+	net_state_t *net = data;
 	char buffer[256];
 	for (;;) {
-		int rc = read(ctx.sock, buffer, sizeof(buffer) - 1);
+		int rc = read(net->sock, buffer, sizeof(buffer) - 1);
 		if (rc == -1) {
-			perror("ERROR: read socket");
+			perror("ERROR read socket");
 			return 1;
 		}
 		message_t msg = {};
@@ -148,7 +142,7 @@ static int recv_thread_proc(void *data) {
 			msg.type = MSG_STR;
 			strcpy(msg.str, buffer);
 		}
-		enqueue(ctx.queue, &msg);
+		enqueue(&net->recv_queue, &msg);
 
 		if (msg.type == MSG_CLOSE) {
 			break;
@@ -159,17 +153,17 @@ static int recv_thread_proc(void *data) {
 }
 
 static int send_thread_proc(void *data) {
-	struct thread_ctx ctx = *((struct thread_ctx*)data);
+	net_state_t *net = data;
 	message_t msg;
 	for (;;) {
-		if (dequeue(ctx.queue, &msg)) {
+		if (dequeue(&net->send_queue, &msg)) {
 			if (msg.type == MSG_CLOSE) {
 				break;
 			} else if (msg.type == MSG_STR) {
 				int msg_len = strlen(msg.str) + 1;
-				int wc = write(ctx.sock, msg.str, msg_len);
+				int wc = write(net->sock, msg.str, msg_len);
 				if (wc == -1) {
-					perror("ERROR: write socket");
+					perror("ERROR write socket");
 					return 1;
 				} else if (wc != msg_len) {
 					fprintf(stderr, "ERROR: write failed to write all bytes\n");
@@ -184,98 +178,80 @@ static int send_thread_proc(void *data) {
 	return 0;
 }
 
-void exit_usage(char *script) {
-	fprintf(stderr,
-		"Usage:\n"
-		"    %s server PORT\n"
-		"    %s client HOST PORT\n",
-		script, script
-	);
-	exit(1);
+extern net_state_t *net_start(net_mode_t mode, char *host, char *port) {
+	net_state_t *net = malloc(sizeof(net_state_t));
+	if (!net) {
+		perror("ERROR malloc");
+		return 0;
+	}
+	memset(net, 0, sizeof(net_state_t));
+
+	net->sock = -1;
+	switch (mode) {
+		case NET_SERVER:
+			net->sock = start_server(port);
+			break;
+		case NET_CLIENT:
+			net->sock = start_client(host, port);
+			break;
+	}
+	if (net->sock == -1)
+		goto error;
+
+	net->recv_thread = SDL_CreateThread(recv_thread_proc, "receiver", net);
+	if (!net->recv_thread) {
+		fprintf(stderr, "ERROR SDL_CreateThread: %s\n", SDL_GetError());
+		goto error;
+	}
+	net->send_thread = SDL_CreateThread(send_thread_proc, "sender", net);
+	if (!net->send_thread) {
+		fprintf(stderr, "ERROR SDL_CreateThread: %s\n", SDL_GetError());
+		goto error;
+	}
+
+	return net;
+error:
+	free(net);
+	return 0;
 }
 
-int main(int argc, char **argv) {
-	int sockd = -1;
-	bool server = false;
-	if (argc < 2)
-		exit_usage(argv[0]);
-	if (strcmp(argv[1], "server") == 0) {
-		if (argc != 3)
-			exit_usage(argv[0]);
-		char *port = argv[2];
-		sockd = start_server(port);
-		server = true;
-	} else if (strcmp(argv[1], "client") == 0) {
-		if (argc != 4)
-			exit_usage(argv[0]);
-		char *host = argv[2];
-		char *port = argv[3];
-		sockd = start_client(host, port);
-	} else {
-		exit_usage(argv[0]);
-	}
-
-	if (sockd == -1)
-		return 1;
-
-	queue_t recv_queue = {};
-	struct thread_ctx recv_ctx = { &recv_queue, sockd };
-	SDL_Thread *recv_thread = SDL_CreateThread(recv_thread_proc, "receiver", &recv_ctx);
-
-	queue_t send_queue = {};
-	struct thread_ctx send_ctx = { &send_queue, sockd };
-	SDL_Thread *send_thread = SDL_CreateThread(send_thread_proc, "sender", &send_ctx);
-
-	bool send = !server;
-	for (;;) {
-		message_t msg;
-		if (send) {
-			send = false;
-
-			printf("> ");
-			fgets(msg.str, 255, stdin);
-			msg.str[strlen(msg.str) - 1] = 0; // remove newline
-			if (strcmp(msg.str, "!close") == 0) {
-				msg.type = MSG_CLOSE;
-			} else {
-				msg.type = MSG_STR;
-			}
-			enqueue(&send_queue, &msg);
-			if (msg.type == MSG_CLOSE) {
-				if (shutdown(sockd, SHUT_RDWR) == -1) {
-					perror("ERROR: shutdown");
-					return 1;
-				}
-				break;
-			}
-		} else {
-			send = true;
-
-			while (!dequeue(&recv_queue, &msg)) {
-				SDL_Delay(50);
-			}
-			if (msg.type == MSG_STR) {
-				printf("MSG_STR: %s\n", msg.str);
-			} else if (msg.type == MSG_CLOSE) {
-				enqueue(&send_queue, &msg);
-				printf("Connection closed by %s\n", server ? "client" : "server");
-				break;
-			}
-		}
-	}
-
-	printf("Exiting...\n");
-
+extern void net_quit(net_state_t *net) {
 	int thread_res;
-	SDL_WaitThread(recv_thread, &thread_res);
+	SDL_WaitThread(net->recv_thread, &thread_res);
 	if (thread_res)
 		fprintf(stderr, "receiver thread exit with error\n");
-	SDL_WaitThread(send_thread, &thread_res);
+	SDL_WaitThread(net->send_thread, &thread_res);
 	if (thread_res)
 		fprintf(stderr, "sender thread exit with error\n");
 
-	if (close(sockd) == -1) {
-		perror("ERROR: close");
-		return 1;
+	if (close(net->sock) == -1)
+		perror("ERROR close");
+}
+
+extern bool net_poll_message(net_state_t *net, message_t *msg) {
+	if (dequeue(&net->recv_queue, msg)) {
+		if (msg->type == MSG_CLOSE) {
+			if (!enqueue(&net->send_queue, msg)) {
+				fprintf(stderr, "ERROR: send message queue is full\n");
+				return false;
+			}
+		}
+		return true;
+	} else {
+		return false;
 	}
+}
+
+extern bool net_send_message(net_state_t *net, message_t *msg) {
+	if (!enqueue(&net->send_queue, msg)) {
+		fprintf(stderr, "ERROR: send message queue is full\n");
+		return false;
+	}
+	if (msg->type == MSG_CLOSE) {
+		if (shutdown(net->sock, SHUT_RDWR) == -1) {
+			perror("ERROR shutdown");
+			return false;
+		}
+	}
+	return true;
 }
