@@ -142,7 +142,10 @@ static int recv_thread_proc(void *data) {
 			msg.type = MSG_STR;
 			strcpy(msg.str, buffer);
 		}
-		enqueue(&net->recv_queue, &msg);
+		if (!enqueue(&net->recv_queue, &msg)) {
+			fprintf(stderr, "ERROR: receive queue is full\n");
+			return 1;
+		}
 
 		if (msg.type == MSG_CLOSE) {
 			break;
