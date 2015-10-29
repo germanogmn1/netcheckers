@@ -5,52 +5,19 @@
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
-typedef struct {
-	SDL_Window *window;
-	SDL_Renderer *renderer;
+struct textures {
+	SDL_Texture *board;
 	SDL_Texture *red_piece;
 	SDL_Texture *red_piece_king;
 	SDL_Texture *white_piece;
 	SDL_Texture *white_piece_king;
 	SDL_Texture *highlight;
-} sdl_context_t;
+};
 
-static void sdl_cleanup(sdl_context_t *ctx) {
-	if (ctx->white_piece)
-		SDL_DestroyTexture(ctx->white_piece);
-	if (ctx->red_piece)
-		SDL_DestroyTexture(ctx->red_piece);
-	if (ctx->renderer)
-		SDL_DestroyRenderer(ctx->renderer);
-	if (ctx->window)
-		SDL_DestroyWindow(ctx->window);
-	IMG_Quit();
-	SDL_Quit();
-}
-
-static void sdl_error(sdl_context_t *ctx, char *name) {
-	fprintf(stderr, "%s Error: %s\n", name, SDL_GetError());
-	sdl_cleanup(ctx);
-	exit(1);
-}
-
-static void img_error(sdl_context_t *ctx, char *name) {
-	fprintf(stderr, "%s Error: %s\n", name, IMG_GetError());
-	sdl_cleanup(ctx);
-	exit(1);
-}
-
-static SDL_Texture *load_png_texture(sdl_context_t *ctx, char *path) {
-	SDL_Surface *surface = IMG_Load(path);
-	if (!surface)
-		img_error(ctx, "IMG_Load");
-	SDL_Texture *texture = SDL_CreateTextureFromSurface(ctx->renderer, surface);
-	SDL_FreeSurface(surface);
-	if (!texture) {
-		sdl_error(ctx, "SDL_CreateTextureFromSurface");
-	}
-	return texture;
-}
+typedef union {
+	struct textures textures;
+	SDL_Texture *array[sizeof(struct textures) / sizeof(SDL_Texture *)];
+} textures_t;
 
 typedef struct {
 	int row;
@@ -72,15 +39,6 @@ typedef struct {
 	cell_pos_t pos;
 } piece_t;
 
-static void advance_board_row_col(int *row, int *col) {
-	if (*col >= 6) {
-		*col = (*col % 2 == 0) ? 1 : 0;
-		(*row)++;
-	} else {
-		*col += 2;
-	}
-}
-
 typedef struct {
 	cell_pos_t pos;
 	piece_t *capture;
@@ -91,12 +49,12 @@ typedef struct {
 	int count;
 } piece_moves_t;
 
-static float lerp(float a, float b, float t) {
-	return (1-t)*a + t*b;
-}
+// SDL handles
+static SDL_Window *window;
+static SDL_Renderer *renderer;
+static textures_t tex;
 
-static sdl_context_t sdl;
-
+// Game logic state
 static piece_color_t turn;
 static piece_t pieces[24];
 static piece_t *board[8][8];
@@ -105,59 +63,107 @@ static piece_moves_t available_moves; // moves for the selected piece
 static piece_t *must_capture[10];
 static int must_capture_count;
 
-// Piece move animation
+// Animation state
 static piece_t *animating_piece;
 static piece_t *animating_capture;
 static cell_pos_t animating_from;
 static float animating_t;
 
-static int window_width;
-static int window_height;
+// Rendering parameters
+static const int WINDOW_WIDTH = 800;//673;
+static const int WINDOW_HEIGHT = 800;//737;
+static const float board_border = 0.1; // board border size in texture percentage
+static SDL_Rect outer_board_rect;
+static SDL_Rect board_rect;
 static int render_width;
 static int render_height;
 static float dpi_rate;
-static int board_ver_padding;
-static int board_size;
-static int board_hor_padding;
 static int cell_size;
-static SDL_Rect cell_rects[32];
+
+static SDL_Texture *load_png_texture(char *path, char **error) {
+	SDL_Texture *texture = 0;
+	SDL_Surface *surface = IMG_Load(path);
+	if (surface) {
+		texture = SDL_CreateTextureFromSurface(renderer, surface);
+		if (!texture)
+			*error = (char *)SDL_GetError();
+		SDL_FreeSurface(surface);
+	} else {
+		*error = (char *)IMG_GetError();
+	}
+	return texture;
+}
+
+static bool rect_includes(SDL_Rect *rect, int x, int y) {
+	bool result = false;
+	if (x >= rect->x && x < rect->x + rect->w &&
+		y >= rect->y && y < rect->y + rect->h)
+		result = true;
+	return result;
+}
+
+static void advance_board_row_col(int *row, int *col) {
+	if (*col >= 6) {
+		*col = (*col % 2 == 0) ? 1 : 0;
+		(*row)++;
+	} else {
+		*col += 2;
+	}
+}
+
+static float lerp(float a, float b, float t) {
+	return (1-t)*a + t*b;
+}
 
 static void cell_to_rect(cell_pos_t cell, SDL_Rect *rect) {
-	rect->x = board_hor_padding + (cell.col * cell_size);
-	rect->y = board_ver_padding + (cell.row * cell_size);
+	rect->x = board_rect.x + (cell.col * cell_size);
+	rect->y = board_rect.y + (cell.row * cell_size);
 	rect->w = cell_size;
 	rect->h = cell_size;
 }
 
+static cell_pos_t point_to_cell(int x, int y) {
+	cell_pos_t result = {};
+	result.row = (y - board_rect.y) / cell_size;
+	result.col = (x - board_rect.x) / cell_size;
+	return result;
+}
+
 static SDL_Texture *texture_for_piece(piece_t *piece) {
 	if (piece->color == PIECE_RED)
-		return piece->king ? sdl.red_piece_king : sdl.red_piece;
+		return piece->king ? tex.textures.red_piece_king : tex.textures.red_piece;
 	else
-		return piece->king ? sdl.white_piece_king : sdl.white_piece;
+		return piece->king ? tex.textures.white_piece_king : tex.textures.white_piece;
 }
 
 static void window_resized(int width, int height) {
-	window_width = width;
-	window_height = height;
-	SDL_GetRendererOutputSize(sdl.renderer, &render_width, &render_height);
+	SDL_GetRendererOutputSize(renderer, &render_width, &render_height);
 	dpi_rate = (float)render_width / (float)width;
-	board_ver_padding = 0.05 * render_height;
-	board_size = (render_height - (board_ver_padding * 2));
-	board_hor_padding = (render_width - board_size) / 2;
-	cell_size = board_size / 8;
-	board_size = cell_size * 8;
 
-	int i = 0;
-	for (int row = 0, col = 0;
-		row < 8;
-		advance_board_row_col(&row, &col)
-	) {
-		SDL_Rect *rect = cell_rects + i++;
-		rect->x = board_hor_padding + (col * cell_size);
-		rect->y = board_ver_padding + (row * cell_size);
-		rect->w = cell_size;
-		rect->h = cell_size;
+	if (render_width > render_height) {
+		outer_board_rect.x = (render_width - render_height) / 2;
+		outer_board_rect.y = 0;
+		outer_board_rect.w = render_height;
+		outer_board_rect.h = render_height;
+	} else {
+		outer_board_rect.x = 0;
+		outer_board_rect.y = (render_height - render_width) / 2;
+		outer_board_rect.w = render_width;
+		outer_board_rect.h = render_width;
 	}
+
+	// Force board size alignment to 10 pixels to prevent integer rounding problems
+	int rem = outer_board_rect.w % 10;
+	outer_board_rect.w -= rem;
+	outer_board_rect.h -= rem;
+
+	int border_pixels = (board_border * outer_board_rect.w);
+	board_rect.x = outer_board_rect.x + border_pixels;
+	board_rect.y = outer_board_rect.y + border_pixels;
+	board_rect.w = outer_board_rect.w - border_pixels*2;
+	board_rect.h = outer_board_rect.h - border_pixels*2;
+
+	cell_size = board_rect.w / 8;
 }
 
 static bool valid_cell(cell_pos_t pos) {
@@ -185,7 +191,7 @@ static void find_move(piece_moves_t *moves, piece_t *piece, int row_dir, int col
 	}
 }
 
-piece_moves_t get_moves_for_piece(piece_t *piece) {
+static piece_moves_t get_moves_for_piece(piece_t *piece) {
 	piece_moves_t result = {};
 
 	if (piece->color == PIECE_WHITE || piece->king) {
@@ -218,7 +224,7 @@ piece_moves_t get_moves_for_piece(piece_t *piece) {
 	return result;
 }
 
-void clicked_cell(cell_pos_t pos) {
+static void clicked_cell(cell_pos_t pos) {
 	piece_t *clicked_piece = board[pos.row][pos.col];
 	if (clicked_piece && clicked_piece->color == turn) {
 		bool piece_can_move = true;
@@ -290,36 +296,55 @@ void clicked_cell(cell_pos_t pos) {
 	}
 }
 
+static void log_error(char *prefix, const char *message) {
+	fprintf(stderr, "ERROR %s: %s\n", prefix, message);
+}
+
 int main(int argc, char **argv) {
-	if (SDL_Init(SDL_INIT_VIDEO))
-		sdl_error(&sdl, "SDL_Init");
-	if (IMG_Init(IMG_INIT_PNG) != IMG_INIT_PNG)
-		img_error(&sdl, "IMG_Init");
+	int return_status = 1;
 
-	window_width = 1024,
-	window_height = 768;
+	#define MAIN_SDL_CHECK(expression, error_prefix) { \
+		if (!(expression)) { \
+			log_error(error_prefix, SDL_GetError()); \
+			goto exit; \
+		} \
+	}
 
-	sdl.window = SDL_CreateWindow(
+	MAIN_SDL_CHECK(SDL_Init(SDL_INIT_VIDEO) == 0, "SDL_Init");
+	if (IMG_Init(IMG_INIT_PNG) != IMG_INIT_PNG) {
+		log_error("IMG_Init", IMG_GetError());
+		goto exit;
+	}
+	MAIN_SDL_CHECK(SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "2"), "SDL_SetHint SDL_HINT_RENDER_SCALE_QUALITY");
+
+	window = SDL_CreateWindow(
 		"netcheckers",
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		window_width, window_height,
+		WINDOW_WIDTH, WINDOW_HEIGHT,
 		SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI
 	);
+	MAIN_SDL_CHECK(window, "SDL_CreateWindow");
 
-	if (!sdl.window)
-		sdl_error(&sdl, "SDL_CreateWindow");
+	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+	MAIN_SDL_CHECK(renderer, "SDL_CreateRenderer");
+	MAIN_SDL_CHECK(SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND) == 0, "SDL_SetRenderDrawBlendMode SDL_BLENDMODE_BLEND");
 
-	sdl.renderer = SDL_CreateRenderer(sdl.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-	if (!sdl.renderer)
-		sdl_error(&sdl, "SDL_CreateRenderer");
+	char *error = 0;
+	#define LOAD_TEXTURE_CHECKED(var, file) {\
+		var = load_png_texture(file, &error); \
+		if (error) { \
+			log_error("load_png_texture " file, error); \
+			goto exit; \
+		} \
+	}
+	LOAD_TEXTURE_CHECKED(tex.textures.board, "board.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.red_piece, "piece_red.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.red_piece_king, "piece_red_king.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.white_piece, "piece_white.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.white_piece_king, "piece_white_king.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.highlight, "highlight.png");
 
-	sdl.red_piece = load_png_texture(&sdl, "piece_red.png");
-	sdl.red_piece_king = load_png_texture(&sdl, "piece_red_king.png");
-	sdl.white_piece = load_png_texture(&sdl, "piece_white.png");
-	sdl.white_piece_king = load_png_texture(&sdl, "piece_white_king.png");
-	sdl.highlight = load_png_texture(&sdl, "highlight.png");
-
-	window_resized(window_width, window_height);
+	window_resized(WINDOW_WIDTH, WINDOW_HEIGHT);
 
 	// Init board state
 	int fill_row = 0;
@@ -353,7 +378,6 @@ int main(int argc, char **argv) {
 		last_time = current_time;
 
 		float dt = (float)ellapsed_ms / 1000.0f;
-		// printf("%f\n", dt);
 
 		SDL_Event event = {};
 		while (SDL_PollEvent(&event)) {
@@ -369,19 +393,14 @@ int main(int argc, char **argv) {
 				case SDL_MOUSEBUTTONDOWN: {
 					// DEBUG remove piece with right click
 					if (event.button.state == SDL_PRESSED && event.button.button == SDL_BUTTON_RIGHT) {
-						int x = event.button.x * dpi_rate,
-							y = event.button.y * dpi_rate;
-
-						if ((x > board_hor_padding && x <= board_hor_padding + board_size) &&
-							(y > board_ver_padding && y <= board_ver_padding + board_size)) {
-							cell_pos_t p = {
-								(y - board_ver_padding) / cell_size,
-								(x - board_hor_padding) / cell_size
-							};
-							piece_t * piece = board[p.row][p.col];
+						int click_x = event.button.x * dpi_rate;
+						int click_y = event.button.y * dpi_rate;
+						if (rect_includes(&board_rect, click_x, click_y)) {
+							cell_pos_t click_pos = point_to_cell(click_x, click_y);
+							piece_t *piece = board[click_pos.row][click_pos.col];
 							if (piece) {
 								piece->captured = true;
-								board[p.row][p.col] = 0;
+								board[click_pos.row][click_pos.col] = 0;
 								selected_piece = 0;
 							}
 						}
@@ -390,16 +409,10 @@ int main(int argc, char **argv) {
 					if (event.button.state == SDL_PRESSED && event.button.button == SDL_BUTTON_LEFT) {
 						if (animating_piece)
 							break;
-
-						int x = event.button.x * dpi_rate,
-							y = event.button.y * dpi_rate;
-
-						if ((x > board_hor_padding && x <= board_hor_padding + board_size) &&
-							(y > board_ver_padding && y <= board_ver_padding + board_size)) {
-							cell_pos_t click_pos = {
-								(y - board_ver_padding) / cell_size,
-								(x - board_hor_padding) / cell_size
-							};
+						int click_x = event.button.x * dpi_rate;
+						int click_y = event.button.y * dpi_rate;
+						if (rect_includes(&board_rect, click_x, click_y)) {
+							cell_pos_t click_pos = point_to_cell(click_x, click_y);
 							clicked_cell(click_pos);
 						}
 					}
@@ -407,32 +420,28 @@ int main(int argc, char **argv) {
 			}
 		}
 
-		SDL_SetRenderDrawColor(sdl.renderer, 206, 183, 125, 255);
-		SDL_RenderClear(sdl.renderer);
+		SDL_SetRenderDrawColor(renderer, 0xdd, 0xdd, 0xdd, 0xff);
+		SDL_RenderClear(renderer);
 
-		SDL_SetRenderDrawColor(sdl.renderer, 84, 75, 51, 255);
-		SDL_RenderFillRects(sdl.renderer, cell_rects, 8*8/2);
+		SDL_RenderCopy(renderer, tex.textures.board, 0, &outer_board_rect);
 
-		SDL_Rect outline = {board_hor_padding-1, board_ver_padding-1, board_size+1, board_size+1};
-		SDL_RenderDrawRect(sdl.renderer, &outline);
-
-		if (must_capture_count) {
+		if (must_capture_count && !animating_piece) {
 			for (int i = 0; i < must_capture_count; i++) {
 				SDL_Rect rect = {};
 				cell_to_rect(must_capture[i]->pos, &rect);
-				SDL_RenderCopy(sdl.renderer, sdl.highlight, 0, &rect);
+				SDL_RenderCopy(renderer, tex.textures.highlight, 0, &rect);
 			}
 		}
 
 		if (selected_piece) {
 			SDL_Rect rect = {};
 			cell_to_rect(selected_piece->pos, &rect);
-			SDL_SetRenderDrawColor(sdl.renderer, 128, 128, 255, 128);
-			SDL_RenderFillRect(sdl.renderer, &rect);
+			SDL_SetRenderDrawColor(renderer, 0x80, 0x80, 0xff, 0xa0);
+			SDL_RenderFillRect(renderer, &rect);
 			for (int i = 0; i < available_moves.count; i++) {
 				cell_pos_t pos = available_moves.moves[i].pos;
 				cell_to_rect(pos, &rect);
-				SDL_RenderFillRect(sdl.renderer, &rect);
+				SDL_RenderFillRect(renderer, &rect);
 			}
 		}
 
@@ -448,9 +457,9 @@ int main(int argc, char **argv) {
 					SDL_Rect rect;
 					cell_to_rect(animating_capture->pos, &rect);
 					SDL_Texture *texture = texture_for_piece(animating_capture);
-					SDL_SetTextureAlphaMod(texture, (Uint8)((1 - animating_t) * 255));
-					SDL_RenderCopy(sdl.renderer, texture, 0, &rect);
-					SDL_SetTextureAlphaMod(texture, 255);
+					SDL_SetTextureAlphaMod(texture, (Uint8)((1 - animating_t) * 0xff));
+					SDL_RenderCopy(renderer, texture, 0, &rect);
+					SDL_SetTextureAlphaMod(texture, 0xff);
 				}
 
 				SDL_Rect from_rect = {};
@@ -463,7 +472,7 @@ int main(int argc, char **argv) {
 				lerp_rect.y = (int)lerp(from_rect.y, to_rect.y, animating_t);
 				lerp_rect.w = cell_size;
 				lerp_rect.h = cell_size;
-				SDL_RenderCopy(sdl.renderer, texture_for_piece(animating_piece), 0, &lerp_rect);
+				SDL_RenderCopy(renderer, texture_for_piece(animating_piece), 0, &lerp_rect);
 			}
 		}
 
@@ -472,13 +481,24 @@ int main(int argc, char **argv) {
 			if (!piece->captured && piece != animating_piece) {
 				SDL_Rect rect = {};
 				cell_to_rect(piece->pos, &rect);
-				SDL_RenderCopy(sdl.renderer, texture_for_piece(piece), 0, &rect);
+				SDL_RenderCopy(renderer, texture_for_piece(piece), 0, &rect);
 			}
 		}
 
-		SDL_RenderPresent(sdl.renderer);
+		SDL_RenderPresent(renderer);
 	}
 
-	sdl_cleanup(&sdl);
-	return 0;
+	return_status = 0;
+exit:
+	for (int i = 0; i < ARRAY_SIZE(tex.array); i++) {
+		if (tex.array[i])
+			SDL_DestroyTexture(tex.array[i]);
+	}
+	if (renderer)
+		SDL_DestroyRenderer(renderer);
+	if (window)
+		SDL_DestroyWindow(window);
+	IMG_Quit();
+	SDL_Quit();
+	return return_status;
 }
