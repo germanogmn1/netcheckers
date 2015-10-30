@@ -1,15 +1,18 @@
+#pragma once
 #include <stdbool.h>
+#include "common.h"
 
 typedef struct _net_state net_state_t;
 
 typedef enum {
 	MSG_CLOSE,
-	MSG_STR,
+	MSG_MOVE,
 } message_type_t;
 
 typedef struct {
 	message_type_t type;
-	char str[256];
+	cell_pos_t move_piece;
+	cell_pos_t move_target;
 } message_t;
 
 typedef enum { NET_SERVER, NET_CLIENT } net_mode_t;

@@ -139,8 +139,18 @@ static int recv_thread_proc(void *data) {
 				fprintf(stderr, "ERROR: received message isn't null terminated\n");
 				return 1;
 			}
-			msg.type = MSG_STR;
-			strcpy(msg.str, buffer);
+
+			// parse message
+			msg.type = MSG_MOVE;
+			int status = sscanf(
+				buffer,
+				"MOVE %d %d TO %d %d",
+				&msg.move_piece.row, &msg.move_piece.col,
+				&msg.move_target.row, &msg.move_target.col
+			);
+			if (status != 4) {
+				exit(171); // TODO handle error
+			}
 		}
 		if (!enqueue(&net->recv_queue, &msg)) {
 			fprintf(stderr, "ERROR: receive queue is full\n");
@@ -162,13 +172,21 @@ static int send_thread_proc(void *data) {
 		if (dequeue(&net->send_queue, &msg)) {
 			if (msg.type == MSG_CLOSE) {
 				break;
-			} else if (msg.type == MSG_STR) {
-				int msg_len = strlen(msg.str) + 1;
-				int wc = write(net->sock, msg.str, msg_len);
+			} else if (msg.type == MSG_MOVE) {
+				char buffer[256];
+				// serialize message
+				int msg_len = sprintf(
+					buffer,
+					"MOVE %d %d TO %d %d",
+					msg.move_piece.row, msg.move_piece.col,
+					msg.move_target.row, msg.move_target.col
+				);
+
+				int wc = write(net->sock, buffer, msg_len + 1);
 				if (wc == -1) {
 					perror("ERROR write socket");
 					return 1;
-				} else if (wc != msg_len) {
+				} else if (wc != msg_len + 1) {
 					fprintf(stderr, "ERROR: write failed to write all bytes\n");
 					return 1;
 				}
