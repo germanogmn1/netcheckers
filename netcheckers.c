@@ -135,16 +135,26 @@ static cell_pos_t cell_pos(int row, int col) {
 }
 
 static void cell_to_rect(cell_pos_t cell, SDL_Rect *rect) {
-	rect->x = board_rect.x + (cell.col * cell_size);
-	rect->y = board_rect.y + (cell.row * cell_size);
+	if (local_color == PIECE_BLACK) {
+		rect->x = board_rect.x + (cell.col * cell_size);
+		rect->y = board_rect.y + (cell.row * cell_size);
+	} else {
+		rect->x = board_rect.x + ((7 - cell.col) * cell_size);
+		rect->y = board_rect.y + ((7 - cell.row) * cell_size);
+	}
 	rect->w = cell_size;
 	rect->h = cell_size;
 }
 
 static cell_pos_t point_to_cell(int x, int y) {
 	cell_pos_t result = {};
-	result.row = (y - board_rect.y) / cell_size;
-	result.col = (x - board_rect.x) / cell_size;
+	if (local_color == PIECE_BLACK) {
+		result.row = (y - board_rect.y) / cell_size;
+		result.col = (x - board_rect.x) / cell_size;
+	} else {
+		result.row = 7 - (y - board_rect.y) / cell_size;
+		result.col = 7 - (x - board_rect.x) / cell_size;
+	}
 	return result;
 }
 
