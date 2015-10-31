@@ -30,6 +30,8 @@ struct textures {
 	SDL_Texture *white_piece;
 	SDL_Texture *white_piece_king;
 	SDL_Texture *highlight;
+	SDL_Texture *player_turn;
+	SDL_Texture *opponent_turn;
 };
 
 typedef union {
@@ -89,6 +91,7 @@ static SDL_Rect board_rect;
 static int render_width;
 static int render_height;
 static float dpi_rate;
+static float scale_rate;
 static int cell_size;
 
 static SDL_Texture *load_png_texture(char *path, char **error) {
@@ -172,6 +175,10 @@ static void window_resized(int width, int height) {
 	int rem = outer_board_rect.w % 10;
 	outer_board_rect.w -= rem;
 	outer_board_rect.h -= rem;
+
+	int twidth;
+	SDL_QueryTexture(tex.textures.board, 0, 0, &twidth, 0);
+	scale_rate = (float)outer_board_rect.w / (float)twidth;
 
 	int border_pixels = (board_border * outer_board_rect.w);
 	board_rect.x = outer_board_rect.x + border_pixels;
@@ -362,6 +369,36 @@ static void render(float dt) {
 
 	SDL_RenderCopy(renderer, tex.textures.board, 0, &outer_board_rect);
 
+	if (!game_over) {
+		SDL_Texture *current_turn_tex = 0;
+		SDL_Texture *past_turn_tex = 0;
+		if (current_turn == local_color) {
+			current_turn_tex = tex.textures.player_turn;
+			past_turn_tex = tex.textures.opponent_turn;
+		} else {
+			current_turn_tex = tex.textures.opponent_turn;
+			past_turn_tex = tex.textures.player_turn;
+		}
+
+		int twidth, theight;
+		SDL_QueryTexture(current_turn_tex, 0, 0, &twidth, &theight);
+
+		SDL_Rect turn_msg_rect = {};
+		turn_msg_rect.w = scale_rate * twidth;
+		turn_msg_rect.h = scale_rate * theight;
+		turn_msg_rect.x = (outer_board_rect.w / 2) - (turn_msg_rect.w / 2);
+		turn_msg_rect.y = 0;
+
+		if (animating_piece) {
+			SDL_SetTextureAlphaMod(current_turn_tex, (Uint8)(animating_t * 0xff));
+			SDL_SetTextureAlphaMod(past_turn_tex, (Uint8)((1 - animating_t) * 0xff));
+			SDL_RenderCopy(renderer, past_turn_tex, 0, &turn_msg_rect);
+		} else {
+			SDL_SetTextureAlphaMod(current_turn_tex, 0xff);
+		}
+		SDL_RenderCopy(renderer, current_turn_tex, 0, &turn_msg_rect);
+	}
+
 	if (current_turn == local_color) {
 		if (selected_piece) {
 			SDL_Rect rect = {};
@@ -483,12 +520,14 @@ int main(int argc, char **argv) {
 			goto exit; \
 		} \
 	}
-	LOAD_TEXTURE_CHECKED(tex.textures.board, "board.png");
-	LOAD_TEXTURE_CHECKED(tex.textures.red_piece, "piece_red.png");
-	LOAD_TEXTURE_CHECKED(tex.textures.red_piece_king, "piece_red_king.png");
-	LOAD_TEXTURE_CHECKED(tex.textures.white_piece, "piece_white.png");
-	LOAD_TEXTURE_CHECKED(tex.textures.white_piece_king, "piece_white_king.png");
-	LOAD_TEXTURE_CHECKED(tex.textures.highlight, "highlight.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.board, "assets/board.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.red_piece, "assets/piece_red.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.red_piece_king, "assets/piece_red_king.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.white_piece, "assets/piece_white.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.white_piece_king, "assets/piece_white_king.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.highlight, "assets/highlight.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.player_turn, "assets/player_turn.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.opponent_turn, "assets/opponent_turn.png");
 
 	window_resized(WINDOW_WIDTH, WINDOW_HEIGHT);
 
