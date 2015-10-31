@@ -115,6 +115,7 @@ static int start_client(char *host, char *port) {
 }
 
 struct _net_state {
+	SDL_atomic_t open;
 	int sock;
 	queue_t recv_queue;
 	SDL_Thread *recv_thread;
@@ -125,23 +126,22 @@ struct _net_state {
 static int recv_thread_proc(void *data) {
 	net_state_t *net = data;
 	char buffer[256];
-	for (;;) {
+	while (SDL_AtomicGet(&net->open)) {
 		int rc = read(net->sock, buffer, sizeof(buffer) - 1);
 		if (rc == -1) {
 			perror("ERROR read socket");
-			return 1;
+			goto error;
 		}
-		message_t msg = {};
 		if (rc == 0) {
-			msg.type = MSG_CLOSE;
+			SDL_AtomicSet(&net->open, 0);
+			break;
 		} else {
+			message_t msg = {};
 			if (buffer[rc - 1]) {
 				fprintf(stderr, "ERROR: received message isn't null terminated\n");
-				return 1;
+				goto error;
 			}
-
 			// parse message
-			msg.type = MSG_MOVE;
 			int status = sscanf(
 				buffer,
 				"MOVE %d %d TO %d %d",
@@ -149,57 +149,56 @@ static int recv_thread_proc(void *data) {
 				&msg.move_target.row, &msg.move_target.col
 			);
 			if (status != 4) {
-				exit(171); // TODO handle error
+				fprintf(stderr, "ERROR: failed to parse message\n");
+				goto error;
 			}
-		}
-		if (!enqueue(&net->recv_queue, &msg)) {
-			fprintf(stderr, "ERROR: receive queue is full\n");
-			return 1;
-		}
-
-		if (msg.type == MSG_CLOSE) {
-			break;
+			if (!enqueue(&net->recv_queue, &msg)) {
+				fprintf(stderr, "ERROR: receive queue is full\n");
+				goto error;
+			}
 		}
 	}
 	// printf("DEBUG exited recv_thread_proc\n");
 	return 0;
+error:
+	SDL_AtomicSet(&net->open, 0);
+	return 1;
 }
 
 static int send_thread_proc(void *data) {
 	net_state_t *net = data;
 	message_t msg;
-	for (;;) {
+	while (SDL_AtomicGet(&net->open)) {
 		if (dequeue(&net->send_queue, &msg)) {
-			if (msg.type == MSG_CLOSE) {
-				break;
-			} else if (msg.type == MSG_MOVE) {
-				char buffer[256];
-				// serialize message
-				int msg_len = sprintf(
-					buffer,
-					"MOVE %d %d TO %d %d",
-					msg.move_piece.row, msg.move_piece.col,
-					msg.move_target.row, msg.move_target.col
-				);
+			char buffer[256];
+			// serialize message
+			int msg_len = sprintf(
+				buffer,
+				"MOVE %d %d TO %d %d",
+				msg.move_piece.row, msg.move_piece.col,
+				msg.move_target.row, msg.move_target.col
+			);
 
-				int wc = write(net->sock, buffer, msg_len + 1);
-				if (wc == -1) {
-					perror("ERROR write socket");
-					return 1;
-				} else if (wc != msg_len + 1) {
-					fprintf(stderr, "ERROR: write failed to write all bytes\n");
-					return 1;
-				}
+			int wc = write(net->sock, buffer, msg_len + 1);
+			if (wc == -1) {
+				perror("ERROR write socket");
+				goto error;
+			} else if (wc != msg_len + 1) {
+				fprintf(stderr, "ERROR: failed to write all bytes\n");
+				goto error;
 			}
 		} else {
-			SDL_Delay(50);
+			SDL_Delay(50); // TODO think in this
 		}
 	}
 	// printf("DEBUG exited send_thread_proc\n");
 	return 0;
+error:
+	SDL_AtomicSet(&net->open, 0);
+	return 1;
 }
 
-extern net_state_t *net_start(net_mode_t mode, char *host, char *port) {
+extern net_state_t *net_connect(net_mode_t mode, char *host, char *port) {
 	net_state_t *net = malloc(sizeof(net_state_t));
 	if (!net) {
 		perror("ERROR malloc");
@@ -219,6 +218,7 @@ extern net_state_t *net_start(net_mode_t mode, char *host, char *port) {
 	if (net->sock == -1)
 		goto error;
 
+	SDL_AtomicSet(&net->open, 1);
 	net->recv_thread = SDL_CreateThread(recv_thread_proc, "receiver", net);
 	if (!net->recv_thread) {
 		fprintf(stderr, "ERROR SDL_CreateThread: %s\n", SDL_GetError());
@@ -232,11 +232,18 @@ extern net_state_t *net_start(net_mode_t mode, char *host, char *port) {
 
 	return net;
 error:
+	// TODO what to do when a thread is running?
 	free(net);
 	return 0;
 }
 
 extern void net_quit(net_state_t *net) {
+	int was_open = SDL_AtomicSet(&net->open, 0);
+	if (was_open) {
+		if (shutdown(net->sock, SHUT_WR))
+			perror("shutdown");
+	}
+
 	int thread_res;
 	SDL_WaitThread(net->recv_thread, &thread_res);
 	if (thread_res)
@@ -247,32 +254,23 @@ extern void net_quit(net_state_t *net) {
 
 	if (close(net->sock) == -1)
 		perror("ERROR close");
+
+	free(net);
+}
+
+extern bool net_is_open(net_state_t *net) {
+	return SDL_AtomicGet(&net->open);
 }
 
 extern bool net_poll_message(net_state_t *net, message_t *msg) {
-	if (dequeue(&net->recv_queue, msg)) {
-		if (msg->type == MSG_CLOSE) {
-			if (!enqueue(&net->send_queue, msg)) {
-				fprintf(stderr, "ERROR: send message queue is full\n");
-				return false;
-			}
-		}
-		return true;
-	} else {
-		return false;
-	}
+	return dequeue(&net->recv_queue, msg);
 }
 
 extern bool net_send_message(net_state_t *net, message_t *msg) {
-	if (!enqueue(&net->send_queue, msg)) {
+	if (enqueue(&net->send_queue, msg)) {
+		return true;
+	} else {
 		fprintf(stderr, "ERROR: send message queue is full\n");
 		return false;
 	}
-	if (msg->type == MSG_CLOSE) {
-		if (shutdown(net->sock, SHUT_RDWR) == -1) {
-			perror("ERROR shutdown");
-			return false;
-		}
-	}
-	return true;
 }

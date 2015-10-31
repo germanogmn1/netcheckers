@@ -501,7 +501,7 @@ int main(int argc, char **argv) {
 
 	if (!parse_cmdline_args(argc, argv, &net_mode, &host, &port))
 		goto exit;
-	network = net_start(net_mode, host, port);
+	network = net_connect(net_mode, host, port);
 	if (!network)
 		goto exit;
 
@@ -610,16 +610,12 @@ int main(int argc, char **argv) {
 		int ellapsed_ms = current_time - last_time;
 		last_time = current_time;
 		float delta_time = (float)ellapsed_ms / 1000.0f;
-		// printf("%f\n", delta_time);
 
 		SDL_Event event = {};
 		while (SDL_PollEvent(&event)) {
 			switch (event.type) {
 				case SDL_QUIT: {
 					running = false;
-					message_t close = {};
-					close.type = MSG_CLOSE;
-					net_send_message(network, &close); // TODO handle error
 				} break;
 				case SDL_WINDOWEVENT: {
 					if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
@@ -630,7 +626,6 @@ int main(int argc, char **argv) {
 					#if 1
 					if (event.button.state == SDL_PRESSED && event.button.button == SDL_BUTTON_RIGHT) {
 						message_t net_msg = {};
-						net_msg.type = MSG_MOVE;
 						net_msg.move_piece = cell_pos(5, 1);
 						net_msg.move_target = cell_pos(4, 0);
 						net_send_message(network, &net_msg);
@@ -654,8 +649,13 @@ int main(int argc, char **argv) {
 
 									move_result_t res = perform_move(selected_piece, clicked_cell);
 									if (res != MOVE_INVALID) {
+										if (res == MOVE_END_TURN) {
+											selected_piece = 0;
+										} else {
+											available_moves = find_valid_moves(selected_piece);
+										}
+
 										message_t net_msg = {};
-										net_msg.type = MSG_MOVE;
 										net_msg.move_piece = from_cell;
 										net_msg.move_target = clicked_cell;
 										if (!net_send_message(network, &net_msg)) {
@@ -668,15 +668,7 @@ int main(int argc, char **argv) {
 											if (err) {
 												log_error("SDL_ShowSimpleMessageBox invalid movement", SDL_GetError());
 											}
-											message_t close = {};
-											close.type = MSG_CLOSE;
-											net_send_message(network, &close); // TODO handle error
-										}
-
-										if (res == MOVE_END_TURN) {
-											selected_piece = 0;
-										} else {
-											available_moves = find_valid_moves(selected_piece);
+											goto exit;
 										}
 									}
 								}
@@ -687,39 +679,33 @@ int main(int argc, char **argv) {
 			}
 		}
 
+		if (!net_is_open(network)) {
+			fprintf(stderr, "Connection closed by %s\n", (net_mode == NET_SERVER) ? "client" : "server");
+			goto exit;
+		}
+
 		message_t net_msg;
 		if (net_poll_message(network, &net_msg)) {
-			switch (net_msg.type) {
-				case MSG_CLOSE: {
-					printf("Connection closed by %s\n", (net_mode == NET_SERVER) ? "client" : "server");
-					running = false;
-				} break;
-				case MSG_MOVE: {
-					bool valid_move = false;
+			bool valid_move = false;
 
-					piece_t *piece = board[net_msg.move_piece.row][net_msg.move_piece.col];
-					if (piece && current_turn != local_color && piece->color != local_color) {
-						move_result_t res = perform_move(piece, net_msg.move_target);
-						if (res != MOVE_INVALID)
-							valid_move = true;
-					}
+			piece_t *piece = board[net_msg.move_piece.row][net_msg.move_piece.col];
+			if (piece && current_turn != local_color && piece->color != local_color) {
+				move_result_t res = perform_move(piece, net_msg.move_target);
+				if (res != MOVE_INVALID)
+					valid_move = true;
+			}
 
-					if (!valid_move) {
-						int err = SDL_ShowSimpleMessageBox(
-							SDL_MESSAGEBOX_ERROR,
-							"Erro - Movimento inválido",
-							"Seu adversário enviou um movimento inválido.",
-							window
-						);
-						if (err) {
-							log_error("SDL_ShowSimpleMessageBox invalid movement", SDL_GetError());
-						}
-						message_t close = {};
-						close.type = MSG_CLOSE;
-						net_send_message(network, &close); // TODO handle error
-						running = false;
-					}
-				} break;
+			if (!valid_move) {
+				int err = SDL_ShowSimpleMessageBox(
+					SDL_MESSAGEBOX_ERROR,
+					"Erro - Movimento inválido",
+					"Seu adversário enviou um movimento inválido.",
+					window
+				);
+				if (err) {
+					log_error("SDL_ShowSimpleMessageBox invalid movement", SDL_GetError());
+				}
+				goto exit;
 			}
 		}
 
