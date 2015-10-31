@@ -5,11 +5,8 @@
 
 /*
 	TODO:
-	* handle invalid moves received from network
 	* simplify connection closing
 	* getting close message from net_recv_message when we close the connection
-	* check why need to click multiple times when switching windows
-	* handle net_send_message failures
 */
 #include <stdio.h>
 #include <stdbool.h>
