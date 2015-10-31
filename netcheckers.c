@@ -5,11 +5,11 @@
 
 /*
 	TODO:
+	* handle invalid moves received from network
 	* simplify connection closing
 	* getting close message from net_recv_message when we close the connection
 	* check why need to click multiple times when switching windows
 	* handle net_send_message failures
-	* handle invalid moves received from network
 */
 #include <stdio.h>
 #include <stdbool.h>
@@ -479,7 +479,7 @@ static void render(float dt) {
 		SDL_Rect turn_msg_rect = {};
 		turn_msg_rect.w = scale_rate * twidth;
 		turn_msg_rect.h = scale_rate * theight;
-		turn_msg_rect.x = (outer_board_rect.w / 2) - (turn_msg_rect.w / 2);
+		turn_msg_rect.x = (render_width / 2) - (turn_msg_rect.w / 2);
 		turn_msg_rect.y = 0;
 
 		if (changed_turn && animating_piece) {
