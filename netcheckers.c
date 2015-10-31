@@ -630,6 +630,15 @@ int main(int argc, char **argv) {
 					}
 				} break;
 				case SDL_MOUSEBUTTONDOWN: {
+					#if 1
+					if (event.button.state == SDL_PRESSED && event.button.button == SDL_BUTTON_RIGHT) {
+						message_t net_msg = {};
+						net_msg.type = MSG_MOVE;
+						net_msg.move_piece = cell_pos(5, 1);
+						net_msg.move_target = cell_pos(4, 0);
+						net_send_message(network, &net_msg);
+					}
+					#endif
 					if (event.button.state == SDL_PRESSED && event.button.button == SDL_BUTTON_LEFT) {
 						if (!game_over && !animating_piece && current_turn == local_color) {
 							int click_x = event.button.x * dpi_rate;
@@ -652,7 +661,20 @@ int main(int argc, char **argv) {
 										net_msg.type = MSG_MOVE;
 										net_msg.move_piece = from_cell;
 										net_msg.move_target = clicked_cell;
-										net_send_message(network, &net_msg); // TODO error handling
+										if (!net_send_message(network, &net_msg)) {
+											int err = SDL_ShowSimpleMessageBox(
+												SDL_MESSAGEBOX_ERROR,
+												"Erro - Falha de comunicação",
+												"Falha ao enviar movimento para o adversário.",
+												window
+											);
+											if (err) {
+												log_error("SDL_ShowSimpleMessageBox invalid movement", SDL_GetError());
+											}
+											message_t close = {};
+											close.type = MSG_CLOSE;
+											net_send_message(network, &close); // TODO handle error
+										}
 
 										if (res == MOVE_END_TURN) {
 											selected_piece = 0;
@@ -669,7 +691,6 @@ int main(int argc, char **argv) {
 		}
 
 		message_t net_msg;
-		// TODO handle turn better in this case
 		if (net_poll_message(network, &net_msg)) {
 			switch (net_msg.type) {
 				case MSG_CLOSE: {
@@ -677,17 +698,29 @@ int main(int argc, char **argv) {
 					running = false;
 				} break;
 				case MSG_MOVE: {
-					// printf("GOT MOVE %d %d TO %d %d\n",
-					// 	net_msg.move_piece.row, net_msg.move_piece.col,
-					// 	net_msg.move_target.row, net_msg.move_target.col);
+					bool valid_move = false;
+
 					piece_t *piece = board[net_msg.move_piece.row][net_msg.move_piece.col];
 					if (piece && current_turn != local_color && piece->color != local_color) {
 						move_result_t res = perform_move(piece, net_msg.move_target);
-						if (res == MOVE_INVALID) {
-							// TODO invalid move, handle error
+						if (res != MOVE_INVALID)
+							valid_move = true;
+					}
+
+					if (!valid_move) {
+						int err = SDL_ShowSimpleMessageBox(
+							SDL_MESSAGEBOX_ERROR,
+							"Erro - Movimento inválido",
+							"Seu adversário enviou um movimento inválido.",
+							window
+						);
+						if (err) {
+							log_error("SDL_ShowSimpleMessageBox invalid movement", SDL_GetError());
 						}
-					} else {
-						// TODO invalid move, handle error
+						message_t close = {};
+						close.type = MSG_CLOSE;
+						net_send_message(network, &close); // TODO handle error
+						running = false;
 					}
 				} break;
 			}
