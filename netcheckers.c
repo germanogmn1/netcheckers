@@ -5,7 +5,6 @@
 
 /*
 	TODO:
-	* ui to display current turn and game over
 	* reuse the code between local and remote for moving pieces
 	* simplify connection closing
 	* getting close message from net_recv_message when we close the connection
@@ -32,6 +31,8 @@ struct textures {
 	SDL_Texture *highlight;
 	SDL_Texture *player_turn;
 	SDL_Texture *opponent_turn;
+	SDL_Texture *victory;
+	SDL_Texture *defeat;
 };
 
 typedef union {
@@ -463,6 +464,24 @@ static void render(float dt) {
 		}
 	}
 
+	if (game_over) {
+		SDL_Texture *msg_tex = (current_turn == local_color) ? tex.textures.defeat : tex.textures.victory;
+		int twidth, theight;
+		SDL_QueryTexture(msg_tex, 0, 0, &twidth, &theight);
+		SDL_Rect msg_rect = {};
+		msg_rect.w = twidth * scale_rate;
+		msg_rect.h = theight * scale_rate;
+		msg_rect.x = (render_width / 2) - (msg_rect.w / 2);
+		msg_rect.y = (render_height / 2) - (msg_rect.h / 2);
+
+		if (animating_piece) {
+			SDL_SetTextureAlphaMod(msg_tex, (Uint8)(animating_t * 0xff));
+		} else {
+			SDL_SetTextureAlphaMod(msg_tex, 0xff);
+		}
+		SDL_RenderCopy(renderer, msg_tex, 0, &msg_rect);
+	}
+
 	SDL_RenderPresent(renderer);
 }
 
@@ -528,6 +547,8 @@ int main(int argc, char **argv) {
 	LOAD_TEXTURE_CHECKED(tex.textures.highlight, "assets/highlight.png");
 	LOAD_TEXTURE_CHECKED(tex.textures.player_turn, "assets/player_turn.png");
 	LOAD_TEXTURE_CHECKED(tex.textures.opponent_turn, "assets/opponent_turn.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.victory, "assets/victory.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.defeat, "assets/defeat.png");
 
 	window_resized(WINDOW_WIDTH, WINDOW_HEIGHT);
 
@@ -584,25 +605,23 @@ int main(int argc, char **argv) {
 		float delta_time = (float)ellapsed_ms / 1000.0f;
 		// printf("%f\n", delta_time);
 
-		if (!game_over) {
-			SDL_Event event = {};
-			while (SDL_PollEvent(&event)) {
-				switch (event.type) {
-					case SDL_QUIT: {
-						running = false;
-						message_t close = {};
-						close.type = MSG_CLOSE;
-						net_send_message(network, &close); // TODO handle error
-					} break;
-					case SDL_WINDOWEVENT: {
-						if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
-							window_resized(event.window.data1, event.window.data2);
-						}
-					} break;
-					case SDL_MOUSEBUTTONDOWN: {
-						if (event.button.state == SDL_PRESSED && event.button.button == SDL_BUTTON_LEFT) {
-							if (animating_piece || current_turn != local_color)
-								break;
+		SDL_Event event = {};
+		while (SDL_PollEvent(&event)) {
+			switch (event.type) {
+				case SDL_QUIT: {
+					running = false;
+					message_t close = {};
+					close.type = MSG_CLOSE;
+					net_send_message(network, &close); // TODO handle error
+				} break;
+				case SDL_WINDOWEVENT: {
+					if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+						window_resized(event.window.data1, event.window.data2);
+					}
+				} break;
+				case SDL_MOUSEBUTTONDOWN: {
+					if (event.button.state == SDL_PRESSED && event.button.button == SDL_BUTTON_LEFT) {
+						if (!game_over && !animating_piece && current_turn == local_color) {
 							int click_x = event.button.x * dpi_rate;
 							int click_y = event.button.y * dpi_rate;
 							if (rect_includes(&board_rect, click_x, click_y)) {
@@ -610,75 +629,70 @@ int main(int argc, char **argv) {
 								clicked_cell(click_pos);
 							}
 						}
-					} break;
-				}
+					}
+				} break;
 			}
-			message_t net_msg;
-			if (net_poll_message(network, &net_msg)) {
-				switch (net_msg.type) {
-					case MSG_CLOSE: {
-						printf("Connection closed by %s\n", (net_mode == NET_SERVER) ? "client" : "server");
-						running = false;
-					} break;
-					case MSG_MOVE: {
-						// printf("GOT MOVE %d %d TO %d %d\n",
-						// 	net_msg.move_piece.row, net_msg.move_piece.col,
-						// 	net_msg.move_target.row, net_msg.move_target.col);
-						move_t *move = 0;
-						piece_t *piece = board[net_msg.move_piece.row][net_msg.move_piece.col];
-						if (piece && piece->color != local_color) {
-							// TODO test must captures
+		}
+
+		message_t net_msg;
+		// TODO handle turn better in this case
+		if (current_turn != local_color && net_poll_message(network, &net_msg)) {
+			switch (net_msg.type) {
+				case MSG_CLOSE: {
+					printf("Connection closed by %s\n", (net_mode == NET_SERVER) ? "client" : "server");
+					running = false;
+				} break;
+				case MSG_MOVE: {
+					// printf("GOT MOVE %d %d TO %d %d\n",
+					// 	net_msg.move_piece.row, net_msg.move_piece.col,
+					// 	net_msg.move_target.row, net_msg.move_target.col);
+					move_t *move = 0;
+					piece_t *piece = board[net_msg.move_piece.row][net_msg.move_piece.col];
+					if (piece && piece->color != local_color) {
+						// TODO test must captures
+						piece_moves_t moves = get_moves_for_piece(piece);
+						for (int i = 0; i < moves.count; i++) {
+							move_t *test = moves.moves + i;
+							if (test->pos.row == net_msg.move_target.row &&
+								test->pos.col == net_msg.move_target.col)
+								move = test;
+						}
+					}
+					if (move) {
+						animating_piece = piece;
+						animating_capture = move->capture;
+						animating_from = piece->pos;
+						animating_t = 0;
+
+						board[piece->pos.row][piece->pos.col] = 0;
+						board[move->pos.row][move->pos.col] = piece;
+						piece->pos = move->pos;
+						if ((piece->color == PIECE_BLACK && move->pos.row == 0) ||
+							(piece->color == PIECE_WHITE && move->pos.row == 7))
+							piece->king = true;
+
+						bool end_turn = true;
+						if (move->capture) {
+							board[move->capture->pos.row][move->capture->pos.col] = 0;
+							move->capture->captured = true;
+
 							piece_moves_t moves = get_moves_for_piece(piece);
-							for (int i = 0; i < moves.count; i++) {
-								move_t *test = moves.moves + i;
-								if (test->pos.row == net_msg.move_target.row &&
-									test->pos.col == net_msg.move_target.col)
-									move = test;
+							if (moves.count > 0 && moves.moves[0].capture) {
+								end_turn = false;
 							}
 						}
-						if (move) {
-							animating_piece = piece;
-							animating_capture = move->capture;
-							animating_from = piece->pos;
-							animating_t = 0;
 
-							board[piece->pos.row][piece->pos.col] = 0;
-							board[move->pos.row][move->pos.col] = piece;
-							piece->pos = move->pos;
-							if ((piece->color == PIECE_BLACK && move->pos.row == 0) ||
-								(piece->color == PIECE_WHITE && move->pos.row == 7))
-								piece->king = true;
-
-							bool end_turn = true;
-							if (move->capture) {
-								board[move->capture->pos.row][move->capture->pos.col] = 0;
-								move->capture->captured = true;
-
-								piece_moves_t moves = get_moves_for_piece(piece);
-								if (moves.count > 0 && moves.moves[0].capture) {
-									end_turn = false;
-								}
-							}
-
-							if (end_turn) {
-								current_turn = (current_turn == PIECE_BLACK) ? PIECE_WHITE : PIECE_BLACK;
-							}
-							bool can_move = update_must_capture();
-							// the player lose when there is no move available
-							if (end_turn && !can_move)
-								game_over = true;
-						} else {
-							// TODO invalid move, handle error
+						if (end_turn) {
+							current_turn = (current_turn == PIECE_BLACK) ? PIECE_WHITE : PIECE_BLACK;
 						}
-					} break;
-				}
-			}
-		} else {
-			if (animating_t <= 0) {
-				running = false;
-				message_t close = {};
-				close.type = MSG_CLOSE;
-				net_send_message(network, &close);
+						bool can_move = update_must_capture();
+						// the player lose when there is no move available
+						if (end_turn && !can_move)
+							game_over = true;
+					} else {
+						// TODO invalid move, handle error
+					}
+				} break;
 			}
 		}
 
