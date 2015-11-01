@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="9059" systemVersion="14F1021" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES">
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="9059"/>
+    </dependencies>
+    <objects>
+        <customObject id="-2" userLabel="File's Owner" customClass="StartupWindow">
+            <connections>
+                <outlet property="hostField" destination="mOG-kw-amN" id="LYu-Mk-Qld"/>
+                <outlet property="hostLabel" destination="49M-l6-NZO" id="UIJ-ev-5ei"/>
+                <outlet property="modeControl" destination="cB1-zV-Srm" id="tuv-2z-cLa"/>
+                <outlet property="portField" destination="s6i-MQ-YmO" id="ppM-lv-VoN"/>
+                <outlet property="window" destination="F0z-JX-Cv5" id="gIp-Ho-8D9"/>
+            </connections>
+        </customObject>
+        <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
+        <customObject id="-3" userLabel="Application" customClass="NSObject"/>
+        <window title="NetCheckers" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" oneShot="NO" releasedWhenClosed="NO" animationBehavior="default" id="F0z-JX-Cv5">
+            <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES" resizable="YES"/>
+            <rect key="contentRect" x="196" y="240" width="238" height="159"/>
+            <rect key="screenRect" x="0.0" y="0.0" width="1440" height="877"/>
+            <value key="minSize" type="size" width="238" height="159"/>
+            <view key="contentView" id="se5-gp-TjO">
+                <rect key="frame" x="0.0" y="0.0" width="238" height="159"/>
+                <autoresizingMask key="autoresizingMask"/>
+                <subviews>
+                    <segmentedControl horizontalHuggingPriority="251" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="cB1-zV-Srm">
+                        <rect key="frame" x="62" y="116" width="123" height="24"/>
+                        <segmentedCell key="cell" borderStyle="border" alignment="left" style="rounded" trackingMode="selectOne" id="M6j-P5-QII">
+                            <font key="font" metaFont="system"/>
+                            <segments>
+                                <segment label="Server" selected="YES"/>
+                                <segment label="Client" tag="1"/>
+                            </segments>
+                        </segmentedCell>
+                        <connections>
+                            <action selector="modeChanged:" target="-2" id="89e-mk-BTw"/>
+                        </connections>
+                    </segmentedControl>
+                    <textField verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="HOs-mU-fra">
+                        <rect key="frame" x="18" y="120" width="40" height="17"/>
+                        <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" alignment="right" title="Mode" id="iO0-Qz-Bsx">
+                            <font key="font" metaFont="system"/>
+                            <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <textField verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="mOG-kw-amN">
+                        <rect key="frame" x="64" y="85" width="154" height="22"/>
+                        <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" state="on" borderStyle="bezel" drawsBackground="YES" id="hAa-1p-VBv">
+                            <font key="font" metaFont="system"/>
+                            <color key="textColor" name="textColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <textField horizontalHuggingPriority="251" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="49M-l6-NZO">
+                        <rect key="frame" x="18" y="87" width="40" height="17"/>
+                        <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" alignment="right" title="Host" id="gSg-Cz-4SY">
+                            <font key="font" metaFont="system"/>
+                            <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <textField horizontalHuggingPriority="251" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="ORz-vc-xNC">
+                        <rect key="frame" x="18" y="55" width="40" height="17"/>
+                        <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" alignment="right" title="Port" id="GSJ-X5-P3P">
+                            <font key="font" metaFont="system"/>
+                            <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <button verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="zkT-0P-caj">
+                        <rect key="frame" x="71" y="13" width="83" height="32"/>
+                        <buttonCell key="cell" type="push" title="Cancel" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="624-kH-P4C">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="system"/>
+                            <string key="keyEquivalent" base64-UTF8="YES">
+Gw
+</string>
+                        </buttonCell>
+                        <connections>
+                            <action selector="performClose:" target="F0z-JX-Cv5" id="lPZ-0t-otI"/>
+                        </connections>
+                    </button>
+                    <button verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="3eX-mY-y1a">
+                        <rect key="frame" x="154" y="13" width="70" height="32"/>
+                        <buttonCell key="cell" type="push" title="Start" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="ePj-gP-yMK">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="system"/>
+                            <string key="keyEquivalent" base64-UTF8="YES">
+DQ
+</string>
+                        </buttonCell>
+                        <connections>
+                            <action selector="startGame:" target="-2" id="s2v-9k-0Sa"/>
+                        </connections>
+                    </button>
+                    <textField verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="s6i-MQ-YmO">
+                        <rect key="frame" x="64" y="53" width="154" height="22"/>
+                        <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" state="on" borderStyle="bezel" drawsBackground="YES" id="w2s-HI-BA4">
+                            <customFormatter key="formatter" id="eib-FW-kM5" customClass="PortValueFormatter"/>
+                            <font key="font" metaFont="system"/>
+                            <color key="textColor" name="textColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                </subviews>
+                <constraints>
+                    <constraint firstItem="ORz-vc-xNC" firstAttribute="top" secondItem="49M-l6-NZO" secondAttribute="bottom" constant="15" id="6lK-vh-Qqk"/>
+                    <constraint firstAttribute="bottom" secondItem="3eX-mY-y1a" secondAttribute="bottom" constant="20" id="84h-Va-guh"/>
+                    <constraint firstItem="mOG-kw-amN" firstAttribute="leading" secondItem="49M-l6-NZO" secondAttribute="trailing" constant="8" id="8ll-z3-3gE"/>
+                    <constraint firstItem="s6i-MQ-YmO" firstAttribute="top" secondItem="mOG-kw-amN" secondAttribute="bottom" constant="10" id="9Q4-fU-ldI"/>
+                    <constraint firstItem="3eX-mY-y1a" firstAttribute="top" secondItem="s6i-MQ-YmO" secondAttribute="bottom" constant="12" id="9UX-cw-PIU"/>
+                    <constraint firstItem="ORz-vc-xNC" firstAttribute="leading" secondItem="se5-gp-TjO" secondAttribute="leading" constant="20" id="EMw-EA-xFQ"/>
+                    <constraint firstItem="HOs-mU-fra" firstAttribute="leading" secondItem="se5-gp-TjO" secondAttribute="leading" constant="20" id="JF3-Y7-JtI"/>
+                    <constraint firstAttribute="trailing" secondItem="mOG-kw-amN" secondAttribute="trailing" constant="20" id="Jkp-9O-fZm"/>
+                    <constraint firstItem="49M-l6-NZO" firstAttribute="leading" secondItem="se5-gp-TjO" secondAttribute="leading" constant="20" id="KLf-8W-2d9"/>
+                    <constraint firstItem="49M-l6-NZO" firstAttribute="top" secondItem="HOs-mU-fra" secondAttribute="bottom" constant="16" id="Lvk-pD-2J9"/>
+                    <constraint firstAttribute="trailing" secondItem="3eX-mY-y1a" secondAttribute="trailing" constant="20" id="MTB-UA-IB6"/>
+                    <constraint firstAttribute="trailing" secondItem="s6i-MQ-YmO" secondAttribute="trailing" constant="20" id="QX9-MM-BJV"/>
+                    <constraint firstItem="HOs-mU-fra" firstAttribute="top" secondItem="se5-gp-TjO" secondAttribute="top" constant="22" id="RRB-GP-K1g"/>
+                    <constraint firstAttribute="bottom" secondItem="zkT-0P-caj" secondAttribute="bottom" constant="20" id="ScW-70-vcu"/>
+                    <constraint firstItem="cB1-zV-Srm" firstAttribute="leading" secondItem="HOs-mU-fra" secondAttribute="trailing" constant="8" id="Zk3-k1-Qqc"/>
+                    <constraint firstItem="ORz-vc-xNC" firstAttribute="width" secondItem="HOs-mU-fra" secondAttribute="width" id="eXX-eL-a58"/>
+                    <constraint firstItem="3eX-mY-y1a" firstAttribute="leading" secondItem="zkT-0P-caj" secondAttribute="trailing" constant="12" id="flr-JU-vW6"/>
+                    <constraint firstItem="s6i-MQ-YmO" firstAttribute="leading" secondItem="ORz-vc-xNC" secondAttribute="trailing" constant="8" id="hGp-B9-GrM"/>
+                    <constraint firstItem="mOG-kw-amN" firstAttribute="top" secondItem="cB1-zV-Srm" secondAttribute="bottom" constant="11" id="iBt-JO-Yw7"/>
+                    <constraint firstItem="49M-l6-NZO" firstAttribute="width" secondItem="HOs-mU-fra" secondAttribute="width" id="mu0-XK-4dw"/>
+                    <constraint firstItem="cB1-zV-Srm" firstAttribute="top" secondItem="se5-gp-TjO" secondAttribute="top" constant="20" id="vPr-pw-IKx"/>
+                </constraints>
+            </view>
+            <connections>
+                <outlet property="delegate" destination="-2" id="0bl-1N-AYu"/>
+            </connections>
+            <point key="canvasLocation" x="237" y="245.5"/>
+        </window>
+    </objects>
+</document>

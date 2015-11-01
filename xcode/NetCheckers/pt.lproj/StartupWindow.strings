@@ -1,0 +1,24 @@
+
+/* Class = "NSButtonCell"; title = "Cancel"; ObjectID = "624-kH-P4C"; */
+"624-kH-P4C.title" = "Cancelar";
+
+/* Class = "NSWindow"; title = "NetCheckers"; ObjectID = "F0z-JX-Cv5"; */
+"F0z-JX-Cv5.title" = "NetCheckers";
+
+/* Class = "NSTextFieldCell"; title = "Port"; ObjectID = "GSJ-X5-P3P"; */
+"GSJ-X5-P3P.title" = "Porta";
+
+/* Class = "NSSegmentedCell"; M6j-P5-QII.ibShadowedLabels[0] = "Server"; ObjectID = "M6j-P5-QII"; */
+"M6j-P5-QII.ibShadowedLabels[0]" = "Servidor";
+
+/* Class = "NSSegmentedCell"; M6j-P5-QII.ibShadowedLabels[1] = "Client"; ObjectID = "M6j-P5-QII"; */
+"M6j-P5-QII.ibShadowedLabels[1]" = "Cliente";
+
+/* Class = "NSButtonCell"; title = "Start"; ObjectID = "ePj-gP-yMK"; */
+"ePj-gP-yMK.title" = "Iniciar";
+
+/* Class = "NSTextFieldCell"; title = "Host"; ObjectID = "gSg-Cz-4SY"; */
+"gSg-Cz-4SY.title" = "Host";
+
+/* Class = "NSTextFieldCell"; title = "Mode"; ObjectID = "iO0-Qz-Bsx"; */
+"iO0-Qz-Bsx.title" = "Modo";

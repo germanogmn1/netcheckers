@@ -127,7 +127,7 @@ static int recv_thread_proc(void *data) {
 	net_state_t *net = data;
 	char buffer[256];
 	while (SDL_AtomicGet(&net->open)) {
-		int rc = read(net->sock, buffer, sizeof(buffer) - 1);
+		ssize_t rc = read(net->sock, buffer, sizeof(buffer) - 1);
 		if (rc == -1) {
 			perror("ERROR read socket");
 			goto error;
@@ -179,7 +179,7 @@ static int send_thread_proc(void *data) {
 				msg.move_target.row, msg.move_target.col
 			);
 
-			int wc = write(net->sock, buffer, msg_len + 1);
+			ssize_t wc = write(net->sock, buffer, msg_len + 1);
 			if (wc == -1) {
 				perror("ERROR write socket");
 				goto error;

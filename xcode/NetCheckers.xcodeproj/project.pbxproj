@@ -1,0 +1,392 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		5D066A771BE4C5E7008AB0A5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5D066A761BE4C5E7008AB0A5 /* Assets.xcassets */; };
+		5D066A7A1BE4C5E7008AB0A5 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 5D066A781BE4C5E7008AB0A5 /* MainMenu.xib */; };
+		5D148ADB1BE4D86900E0B306 /* SDL2_image.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5D5CAFCD1BE4C651003EBC3B /* SDL2_image.framework */; };
+		5D148ADC1BE5FF3F00E0B306 /* netcheckers.c in Sources */ = {isa = PBXBuildFile; fileRef = 5D5CAFD01BE4C681003EBC3B /* netcheckers.c */; };
+		5D148ADD1BE5FF4200E0B306 /* network.c in Sources */ = {isa = PBXBuildFile; fileRef = 5D5CAFD11BE4C681003EBC3B /* network.c */; };
+		5D148ADF1BE5FF9A00E0B306 /* startup_cocoa.m in Sources */ = {isa = PBXBuildFile; fileRef = 5D148ADE1BE5FF9A00E0B306 /* startup_cocoa.m */; };
+		5D4E3D3C1BE61CB5002F9E6F /* StartupWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = 5D4E3D3A1BE61CB5002F9E6F /* StartupWindow.xib */; };
+		5D4FB2DF1BE608EE00A21594 /* board.png in Resources */ = {isa = PBXBuildFile; fileRef = 5D4FB2CB1BE6084900A21594 /* board.png */; };
+		5D4FB2E01BE608EE00A21594 /* defeat.png in Resources */ = {isa = PBXBuildFile; fileRef = 5D4FB2CC1BE6084900A21594 /* defeat.png */; };
+		5D4FB2E11BE608EE00A21594 /* highlight.png in Resources */ = {isa = PBXBuildFile; fileRef = 5D4FB2CD1BE6084900A21594 /* highlight.png */; };
+		5D4FB2E21BE608EE00A21594 /* opponent_turn.png in Resources */ = {isa = PBXBuildFile; fileRef = 5D4FB2CE1BE6084900A21594 /* opponent_turn.png */; };
+		5D4FB2E31BE608EE00A21594 /* piece_red_king.png in Resources */ = {isa = PBXBuildFile; fileRef = 5D4FB2CF1BE6084900A21594 /* piece_red_king.png */; };
+		5D4FB2E41BE608EE00A21594 /* piece_red.png in Resources */ = {isa = PBXBuildFile; fileRef = 5D4FB2D01BE6084900A21594 /* piece_red.png */; };
+		5D4FB2E51BE608EE00A21594 /* piece_white_king.png in Resources */ = {isa = PBXBuildFile; fileRef = 5D4FB2D11BE6084900A21594 /* piece_white_king.png */; };
+		5D4FB2E61BE608EE00A21594 /* piece_white.png in Resources */ = {isa = PBXBuildFile; fileRef = 5D4FB2D21BE6084900A21594 /* piece_white.png */; };
+		5D4FB2E71BE608EE00A21594 /* player_turn.png in Resources */ = {isa = PBXBuildFile; fileRef = 5D4FB2D31BE6084900A21594 /* player_turn.png */; };
+		5D4FB2E81BE608EE00A21594 /* victory.png in Resources */ = {isa = PBXBuildFile; fileRef = 5D4FB2D41BE6084900A21594 /* victory.png */; };
+		5DE0B3171BE4D6DD0026D9CF /* SDL2.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5D5CAFCB1BE4C641003EBC3B /* SDL2.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		5D066A6D1BE4C5E7008AB0A5 /* NetCheckers.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NetCheckers.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5D066A761BE4C5E7008AB0A5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = NetCheckers/Assets.xcassets; sourceTree = SOURCE_ROOT; };
+		5D066A791BE4C5E7008AB0A5 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
+		5D066A7B1BE4C5E7008AB0A5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		5D148ADE1BE5FF9A00E0B306 /* startup_cocoa.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = startup_cocoa.m; path = ../src/startup_cocoa.m; sourceTree = SOURCE_ROOT; };
+		5D4E3D3B1BE61CB5002F9E6F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/StartupWindow.xib; sourceTree = "<group>"; };
+		5D4E3D3E1BE63785002F9E6F /* pt */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = pt; path = pt.lproj/StartupWindow.strings; sourceTree = "<group>"; };
+		5D4FB2CB1BE6084900A21594 /* board.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = board.png; path = ../../assets/board.png; sourceTree = "<group>"; };
+		5D4FB2CC1BE6084900A21594 /* defeat.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = defeat.png; path = ../../assets/defeat.png; sourceTree = "<group>"; };
+		5D4FB2CD1BE6084900A21594 /* highlight.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = highlight.png; path = ../../assets/highlight.png; sourceTree = "<group>"; };
+		5D4FB2CE1BE6084900A21594 /* opponent_turn.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = opponent_turn.png; path = ../../assets/opponent_turn.png; sourceTree = "<group>"; };
+		5D4FB2CF1BE6084900A21594 /* piece_red_king.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = piece_red_king.png; path = ../../assets/piece_red_king.png; sourceTree = "<group>"; };
+		5D4FB2D01BE6084900A21594 /* piece_red.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = piece_red.png; path = ../../assets/piece_red.png; sourceTree = "<group>"; };
+		5D4FB2D11BE6084900A21594 /* piece_white_king.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = piece_white_king.png; path = ../../assets/piece_white_king.png; sourceTree = "<group>"; };
+		5D4FB2D21BE6084900A21594 /* piece_white.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = piece_white.png; path = ../../assets/piece_white.png; sourceTree = "<group>"; };
+		5D4FB2D31BE6084900A21594 /* player_turn.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = player_turn.png; path = ../../assets/player_turn.png; sourceTree = "<group>"; };
+		5D4FB2D41BE6084900A21594 /* victory.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = victory.png; path = ../../assets/victory.png; sourceTree = "<group>"; };
+		5D5CAFCB1BE4C641003EBC3B /* SDL2.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SDL2.framework; path = /Library/Frameworks/SDL2.framework; sourceTree = "<absolute>"; };
+		5D5CAFCD1BE4C651003EBC3B /* SDL2_image.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SDL2_image.framework; path = /Library/Frameworks/SDL2_image.framework; sourceTree = "<absolute>"; };
+		5D5CAFCF1BE4C681003EBC3B /* common.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = common.h; path = ../../src/common.h; sourceTree = "<group>"; };
+		5D5CAFD01BE4C681003EBC3B /* netcheckers.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = netcheckers.c; path = ../../src/netcheckers.c; sourceTree = "<group>"; };
+		5D5CAFD11BE4C681003EBC3B /* network.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = network.c; path = ../../src/network.c; sourceTree = "<group>"; };
+		5D5CAFD21BE4C681003EBC3B /* network.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = network.h; path = ../../src/network.h; sourceTree = "<group>"; };
+		5D9DD5E81BE6151E00E8302A /* pt */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = pt; path = pt.lproj/MainMenu.strings; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		5D066A6A1BE4C5E7008AB0A5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5DE0B3171BE4D6DD0026D9CF /* SDL2.framework in Frameworks */,
+				5D148ADB1BE4D86900E0B306 /* SDL2_image.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		5D066A641BE4C5E7008AB0A5 = {
+			isa = PBXGroup;
+			children = (
+				5D5CAFCD1BE4C651003EBC3B /* SDL2_image.framework */,
+				5D5CAFCB1BE4C641003EBC3B /* SDL2.framework */,
+				5D066A6F1BE4C5E7008AB0A5 /* NetCheckers */,
+				5D066A6E1BE4C5E7008AB0A5 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		5D066A6E1BE4C5E7008AB0A5 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5D066A6D1BE4C5E7008AB0A5 /* NetCheckers.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		5D066A6F1BE4C5E7008AB0A5 /* NetCheckers */ = {
+			isa = PBXGroup;
+			children = (
+				5D4FB2CA1BE6083000A21594 /* assets */,
+				5D5CAFD51BE4C685003EBC3B /* src */,
+				5D066A761BE4C5E7008AB0A5 /* Assets.xcassets */,
+				5D066A781BE4C5E7008AB0A5 /* MainMenu.xib */,
+				5D4E3D3A1BE61CB5002F9E6F /* StartupWindow.xib */,
+				5D066A7B1BE4C5E7008AB0A5 /* Info.plist */,
+			);
+			path = NetCheckers;
+			sourceTree = "<group>";
+		};
+		5D4FB2CA1BE6083000A21594 /* assets */ = {
+			isa = PBXGroup;
+			children = (
+				5D4FB2CB1BE6084900A21594 /* board.png */,
+				5D4FB2CC1BE6084900A21594 /* defeat.png */,
+				5D4FB2CD1BE6084900A21594 /* highlight.png */,
+				5D4FB2CE1BE6084900A21594 /* opponent_turn.png */,
+				5D4FB2CF1BE6084900A21594 /* piece_red_king.png */,
+				5D4FB2D01BE6084900A21594 /* piece_red.png */,
+				5D4FB2D11BE6084900A21594 /* piece_white_king.png */,
+				5D4FB2D21BE6084900A21594 /* piece_white.png */,
+				5D4FB2D31BE6084900A21594 /* player_turn.png */,
+				5D4FB2D41BE6084900A21594 /* victory.png */,
+			);
+			name = assets;
+			sourceTree = "<group>";
+		};
+		5D5CAFD51BE4C685003EBC3B /* src */ = {
+			isa = PBXGroup;
+			children = (
+				5D148ADE1BE5FF9A00E0B306 /* startup_cocoa.m */,
+				5D5CAFCF1BE4C681003EBC3B /* common.h */,
+				5D5CAFD01BE4C681003EBC3B /* netcheckers.c */,
+				5D5CAFD11BE4C681003EBC3B /* network.c */,
+				5D5CAFD21BE4C681003EBC3B /* network.h */,
+			);
+			name = src;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		5D066A6C1BE4C5E7008AB0A5 /* NetCheckers */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5D066A7E1BE4C5E7008AB0A5 /* Build configuration list for PBXNativeTarget "NetCheckers" */;
+			buildPhases = (
+				5D066A691BE4C5E7008AB0A5 /* Sources */,
+				5D066A6A1BE4C5E7008AB0A5 /* Frameworks */,
+				5D066A6B1BE4C5E7008AB0A5 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NetCheckers;
+			productName = NetCheckers;
+			productReference = 5D066A6D1BE4C5E7008AB0A5 /* NetCheckers.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5D066A651BE4C5E7008AB0A5 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0710;
+				ORGANIZATIONNAME = "Germano Nicolini";
+				TargetAttributes = {
+					5D066A6C1BE4C5E7008AB0A5 = {
+						CreatedOnToolsVersion = 7.1;
+						DevelopmentTeam = 33YNY95X7V;
+					};
+				};
+			};
+			buildConfigurationList = 5D066A681BE4C5E7008AB0A5 /* Build configuration list for PBXProject "NetCheckers" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				pt,
+			);
+			mainGroup = 5D066A641BE4C5E7008AB0A5;
+			productRefGroup = 5D066A6E1BE4C5E7008AB0A5 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				5D066A6C1BE4C5E7008AB0A5 /* NetCheckers */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		5D066A6B1BE4C5E7008AB0A5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5D4FB2DF1BE608EE00A21594 /* board.png in Resources */,
+				5D4FB2E01BE608EE00A21594 /* defeat.png in Resources */,
+				5D4FB2E11BE608EE00A21594 /* highlight.png in Resources */,
+				5D4FB2E21BE608EE00A21594 /* opponent_turn.png in Resources */,
+				5D4FB2E31BE608EE00A21594 /* piece_red_king.png in Resources */,
+				5D4FB2E41BE608EE00A21594 /* piece_red.png in Resources */,
+				5D4FB2E51BE608EE00A21594 /* piece_white_king.png in Resources */,
+				5D4FB2E61BE608EE00A21594 /* piece_white.png in Resources */,
+				5D4FB2E71BE608EE00A21594 /* player_turn.png in Resources */,
+				5D4E3D3C1BE61CB5002F9E6F /* StartupWindow.xib in Resources */,
+				5D4FB2E81BE608EE00A21594 /* victory.png in Resources */,
+				5D066A771BE4C5E7008AB0A5 /* Assets.xcassets in Resources */,
+				5D066A7A1BE4C5E7008AB0A5 /* MainMenu.xib in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5D066A691BE4C5E7008AB0A5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5D148ADF1BE5FF9A00E0B306 /* startup_cocoa.m in Sources */,
+				5D148ADC1BE5FF3F00E0B306 /* netcheckers.c in Sources */,
+				5D148ADD1BE5FF4200E0B306 /* network.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		5D066A781BE4C5E7008AB0A5 /* MainMenu.xib */ = {
+			isa = PBXVariantGroup;
+			children = (
+				5D066A791BE4C5E7008AB0A5 /* Base */,
+				5D9DD5E81BE6151E00E8302A /* pt */,
+			);
+			name = MainMenu.xib;
+			sourceTree = "<group>";
+		};
+		5D4E3D3A1BE61CB5002F9E6F /* StartupWindow.xib */ = {
+			isa = PBXVariantGroup;
+			children = (
+				5D4E3D3B1BE61CB5002F9E6F /* Base */,
+				5D4E3D3E1BE63785002F9E6F /* pt */,
+			);
+			name = StartupWindow.xib;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		5D066A7C1BE4C5E7008AB0A5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.10;
+				MTL_ENABLE_DEBUG_INFO = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		5D066A7D1BE4C5E7008AB0A5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.10;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		5D066A7F1BE4C5E7008AB0A5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Mac Developer";
+				COMBINE_HIDPI_IMAGES = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(LOCAL_LIBRARY_DIR)/Frameworks",
+				);
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					NETCHECKERS_XCODE_OSX,
+					DEBUG,
+				);
+				HEADER_SEARCH_PATHS = /Library/Frameworks/SDL_image.framework/Headers;
+				INFOPLIST_FILE = NetCheckers/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 10.10;
+				PRODUCT_BUNDLE_IDENTIFIER = gnicolini.NetCheckers;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "";
+			};
+			name = Debug;
+		};
+		5D066A801BE4C5E7008AB0A5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Mac Developer";
+				COMBINE_HIDPI_IMAGES = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(LOCAL_LIBRARY_DIR)/Frameworks",
+				);
+				GCC_PREPROCESSOR_DEFINITIONS = NETCHECKERS_XCODE_OSX;
+				HEADER_SEARCH_PATHS = /Library/Frameworks/SDL_image.framework/Headers;
+				INFOPLIST_FILE = NetCheckers/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 10.10;
+				PRODUCT_BUNDLE_IDENTIFIER = gnicolini.NetCheckers;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		5D066A681BE4C5E7008AB0A5 /* Build configuration list for PBXProject "NetCheckers" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5D066A7C1BE4C5E7008AB0A5 /* Debug */,
+				5D066A7D1BE4C5E7008AB0A5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5D066A7E1BE4C5E7008AB0A5 /* Build configuration list for PBXNativeTarget "NetCheckers" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5D066A7F1BE4C5E7008AB0A5 /* Debug */,
+				5D066A801BE4C5E7008AB0A5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 5D066A651BE4C5E7008AB0A5 /* Project object */;
+}

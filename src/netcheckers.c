@@ -2,17 +2,12 @@
  * The game is based on the standard U.S. rules for checkers:
  * http://boardgames.about.com/cs/checkersdraughts/ht/play_checkers.htm
  */
-
-/*
-	TODO:
-	* simplify connection closing
-	* getting close message from net_recv_message when we close the connection
-*/
 #include <stdio.h>
 #include <stdbool.h>
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
+#include <SDL2_image/SDL_image.h>
 
+#include "startup.h"
 #include "network.h"
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
@@ -352,25 +347,28 @@ static void log_error(char *prefix, const char *message) {
 	fprintf(stderr, "ERROR %s: %s\n", prefix, message);
 }
 
-static bool parse_cmdline_args(int argc, char **argv, net_mode_t *net_mode, char **host, char **port) {
+static startup_info_t startup_cmdline(int argc, char **argv) {
+	startup_info_t result = {};
 	if (argc == 3 && strcmp(argv[1], "server") == 0) {
-		*net_mode = NET_SERVER;
-		*host = 0;
-		*port = argv[2];
+		result.success = true;
+		result.server_mode = true;
+		strncpy(result.port, argv[2], sizeof(result.port));
 	} else if (argc == 4 && strcmp(argv[1], "client") == 0) {
-		*net_mode = NET_CLIENT;
-		*host = argv[2];
-		*port = argv[3];
+		result.success = true;
+		result.server_mode = false;
+		strncpy(result.host, argv[2], sizeof(result.host));
+		strncpy(result.port, argv[3], sizeof(result.port));
 	} else {
+		result.success = false;
 		fprintf(stderr,
 			"Usage:\n"
 			"    %s server PORT\n"
 			"    %s client HOST PORT\n",
 			argv[0], argv[0]
 		);
-		return false;
 	}
-	return true;
+	strcpy(result.assets_path, "assets");
+	return result;
 }
 
 static void render(float dt) {
@@ -492,18 +490,12 @@ static void render(float dt) {
 	SDL_RenderPresent(renderer);
 }
 
+#ifdef NETCHECKERS_XCODE_OSX
+	startup_info_t startup_cocoa();
+#endif
+
 int main(int argc, char **argv) {
 	int return_status = 1;
-
-	net_mode_t net_mode;
-	char *host;
-	char *port;
-
-	if (!parse_cmdline_args(argc, argv, &net_mode, &host, &port))
-		goto exit;
-	network = net_connect(net_mode, host, port);
-	if (!network)
-		goto exit;
 
 	#define MAIN_SDL_CHECK(expression, error_prefix) { \
 		if (!(expression)) { \
@@ -517,13 +509,28 @@ int main(int argc, char **argv) {
 		log_error("IMG_Init", IMG_GetError());
 		goto exit;
 	}
+
+#ifdef NETCHECKERS_XCODE_OSX
+	startup_info_t info = startup_cocoa();
+#else
+	startup_info_t info = startup_cmdline(argc, argv);
+#endif
+
+	if (!info.success)
+		goto exit;
+
+	net_mode_t net_mode = info.server_mode ? NET_SERVER : NET_CLIENT;
+	network = net_connect(net_mode, info.host, info.port);
+	if (!network)
+		goto exit;
+
 	MAIN_SDL_CHECK(SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "2"), "SDL_SetHint SDL_HINT_RENDER_SCALE_QUALITY");
 
 	char wtitle[256];
 	if (net_mode == NET_SERVER) {
-		snprintf(wtitle, sizeof(wtitle), "netcheckers - server (%s)", port);
+		snprintf(wtitle, sizeof(wtitle), "netcheckers - server (%s)", info.port);
 	} else {
-		snprintf(wtitle, sizeof(wtitle), "netcheckers - client (%s:%s)", host, port);
+		snprintf(wtitle, sizeof(wtitle), "netcheckers - client (%s:%s)", info.host, info.port);
 	}
 	window = SDL_CreateWindow(
 		wtitle,
@@ -539,23 +546,25 @@ int main(int argc, char **argv) {
 	MAIN_SDL_CHECK(SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND) == 0, "SDL_SetRenderDrawBlendMode SDL_BLENDMODE_BLEND");
 
 	char *error = 0;
+	char path[PATH_MAX];
 	#define LOAD_TEXTURE_CHECKED(var, file) { \
-		var = load_png_texture(file, &error); \
+		sprintf(path, "%s/" file, info.assets_path); \
+		var = load_png_texture(path, &error); \
 		if (error) { \
 			log_error("load_png_texture " file, error); \
 			goto exit; \
 		} \
 	}
-	LOAD_TEXTURE_CHECKED(tex.textures.board, "assets/board.png");
-	LOAD_TEXTURE_CHECKED(tex.textures.red_piece, "assets/piece_red.png");
-	LOAD_TEXTURE_CHECKED(tex.textures.red_piece_king, "assets/piece_red_king.png");
-	LOAD_TEXTURE_CHECKED(tex.textures.white_piece, "assets/piece_white.png");
-	LOAD_TEXTURE_CHECKED(tex.textures.white_piece_king, "assets/piece_white_king.png");
-	LOAD_TEXTURE_CHECKED(tex.textures.highlight, "assets/highlight.png");
-	LOAD_TEXTURE_CHECKED(tex.textures.player_turn, "assets/player_turn.png");
-	LOAD_TEXTURE_CHECKED(tex.textures.opponent_turn, "assets/opponent_turn.png");
-	LOAD_TEXTURE_CHECKED(tex.textures.victory, "assets/victory.png");
-	LOAD_TEXTURE_CHECKED(tex.textures.defeat, "assets/defeat.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.board, "board.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.red_piece, "piece_red.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.red_piece_king, "piece_red_king.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.white_piece, "piece_white.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.white_piece_king, "piece_white_king.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.highlight, "highlight.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.player_turn, "player_turn.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.opponent_turn, "opponent_turn.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.victory, "victory.png");
+	LOAD_TEXTURE_CHECKED(tex.textures.defeat, "defeat.png");
 
 	window_resized(window_width, window_height);
 
