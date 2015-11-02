@@ -5,26 +5,47 @@
 static startup_info_t info;
 static enum { OPEN, STARTED, CANCELED } window_state;
 
-@interface PortValueFormatter : NSNumberFormatter
+@interface PortValueFormatter : NSFormatter
 @end
 
 @implementation PortValueFormatter
-- (BOOL)isPartialStringValid:(NSString*)value newEditingString:(NSString**)newString errorDescription:(NSString**)error
-{
-    bool result = YES;
-    if (value.length > 5) {
+- (NSString *)stringForObjectValue:(id)anObject {
+    NSString *result = nil;
+    if ([anObject isKindOfClass:[NSNumber class]]) {
+        result = [NSString stringWithFormat:@"%ld", [anObject integerValue]];
+    }
+    return result;
+}
+- (BOOL)getObjectValue:(id *)obj forString:(NSString *)string errorDescription:(NSString  **)error {
+    BOOL result = NO;
+    if ([self stringIsValid:string]) {
+        *obj = [NSNumber numberWithInt:string.intValue];
+        result = YES;
+    }
+    return result;
+}
+- (BOOL)isPartialStringValid:(NSString *)value newEditingString:(NSString **)newString errorDescription:(NSString **)error {
+    BOOL result = [self stringIsValid:value];
+    if (!result)
+        NSBeep();
+    return result;
+}
+- (BOOL)stringIsValid:(NSString *)string {
+    BOOL result = YES;
+    if (string.length > 5) {
         result = NO;
     } else {
-        for (int i = 0; i < value.length; i++) {
-            unichar c = [value characterAtIndex:i];
-            if (c < '0' || c > '9') {
+        for (int i = 0; i < string.length; i++) {
+            unichar c = [string characterAtIndex:i];
+            BOOL valid = ((i > 0 && c >= '1') || c >= '1') && c <= '9';
+            if (!valid) {
                 result = NO;
                 break;
             }
         }
+        if (result && [string intValue] > UINT16_MAX)
+            result = NO;
     }
-    if (!result)
-        NSBeep();
     return result;
 }
 @end
@@ -49,6 +70,7 @@ static enum { OPEN, STARTED, CANCELED } window_state;
                                              selector:@selector(willClose:)
                                                  name:NSWindowWillCloseNotification
                                                object:self.window];
+    [portField setIntValue:2432];
     [self modeChanged:modeControl];
 }
 
