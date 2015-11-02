@@ -1,13 +1,38 @@
 #include <stdio.h>
+#include <string.h>
+#include <SDL2/SDL.h>
+
+#include "network.h"
+
+#ifdef _WIN32
+
+#include <winsock2.h>
+#include <ws2tcpip.h>
+typedef SOCKET sock_t;
+typedef int ssize_t;
+#define SHUT_WR SD_BOTH
+void log_sock_error(char *msg) {
+	char *res;
+	int flags = FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS;
+	FormatMessageA(flags, 0, WSAGetLastError(), 0, &res, 0, 0);
+	fprintf(stderr, "%s: %s\n", msg, res);
+	LocalFree(res);
+}
+
+#else
+
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <unistd.h>
-#include <string.h>
-#include <SDL2/SDL.h>
+typedef int sock_t;
+#define INVALID_SOCKET -1
+#define SOCKET_ERROR -1
+#define log_sock_error(msg) perror(msg)
+#define closesocket(sock) close(sock)
 
-#include "network.h"
+#endif
 
 #define QUEUE_SIZE 64
 typedef struct {
@@ -49,43 +74,50 @@ static bool dequeue(queue_t *queue, message_t *message) {
 }
 
 // Returns socket descriptor on success, -1 on failure
-static int start_server(char *port) {
-	int sockd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockd == -1) {
-		perror("ERROR create socket");
-		return -1;
+static sock_t start_server(char *port) {
+	sock_t client_sock = INVALID_SOCKET;
+	sock_t server_sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (server_sock == INVALID_SOCKET) {
+		log_sock_error("ERROR create socket");
+		goto exit;
 	}
 	struct sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(atoi(port));
 	addr.sin_addr.s_addr = INADDR_ANY;
-	if (bind(sockd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+	if (bind(server_sock, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR) {
 		char buff[100];
 		sprintf(buff, "ERROR: bind socket to port %s", port);
-		perror(buff);
-		return -1;
+		log_sock_error(buff);
+		goto exit;
 	}
-	if (listen(sockd, 1) == -1) {
-		perror("ERROR listen");
-		return -1;
+	if (listen(server_sock, 1) == SOCKET_ERROR) {
+		log_sock_error("ERROR listen");
+		goto exit;
 	}
 	printf("Waiting for connections on port %s...\n", port);
-	int nsockd = accept(sockd, 0, 0);
-	if (nsockd == -1) {
-		perror("ERROR accept");
-		return -1;
+	client_sock = accept(server_sock, 0, 0);
+	if (client_sock == INVALID_SOCKET) {
+		log_sock_error("ERROR accept");
+		goto exit;
 	}
 	printf("Connected with client\n");
-	if (close(sockd) == -1) {
-		perror("ERROR close");
-		return 1;
+
+exit:
+	if (server_sock != INVALID_SOCKET) {
+		if (closesocket(server_sock) == SOCKET_ERROR) {
+			log_sock_error("ERROR closesocket");
+			client_sock = INVALID_SOCKET;
+		}
 	}
-	return nsockd;
+	return client_sock;
 }
 
 // Returns socket descriptor on success, -1 on failure
-static int start_client(char *host, char *port) {
-	struct addrinfo hints = {};
+static sock_t start_client(char *host, char *port) {
+	sock_t result = INVALID_SOCKET;
+
+	struct addrinfo hints = {0};
 	hints.ai_flags = 0;
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
@@ -93,30 +125,34 @@ static int start_client(char *host, char *port) {
 	struct addrinfo *info;
 	int err = getaddrinfo(host, port, &hints, &info);
 	if (err) {
-		fprintf(stderr, "ERROR: getaddrinfo: %s\n", gai_strerror(err));
-		return -1;
+		fprintf(stderr, "ERROR getaddrinfo: %s\n", gai_strerror(err));
+		goto exit;
 	}
 
-	int sockd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockd == -1) {
-		perror("ERROR create socket");
-		freeaddrinfo(info);
-		return -1;
+	result = socket(AF_INET, SOCK_STREAM, 0);
+	if (result == INVALID_SOCKET) {
+		log_sock_error("ERROR create socket");
+		goto exit;
 	}
 	printf("Connecting with server %s at port %s...\n", host, port);
-	if (connect(sockd, info->ai_addr, info->ai_addrlen) == -1) {
-		perror("ERROR connect");
-		freeaddrinfo(info);
-		return -1;
+	if (connect(result, info->ai_addr, info->ai_addrlen) == SOCKET_ERROR) {
+		log_sock_error("ERROR connect");
+		if (closesocket(result) == SOCKET_ERROR)
+			log_sock_error("ERROR closesocket");
+		result = INVALID_SOCKET;
+		goto exit;
 	}
 	printf("Connected with server\n");
-	freeaddrinfo(info);
-	return sockd;
+
+exit:
+	if (info)
+		freeaddrinfo(info);
+	return result;
 }
 
 struct _net_state {
 	SDL_atomic_t open;
-	int sock;
+	sock_t sock;
 	queue_t recv_queue;
 	SDL_Thread *recv_thread;
 	queue_t send_queue;
@@ -127,16 +163,16 @@ static int recv_thread_proc(void *data) {
 	net_state_t *net = data;
 	char buffer[256];
 	while (SDL_AtomicGet(&net->open)) {
-		ssize_t rc = read(net->sock, buffer, sizeof(buffer) - 1);
-		if (rc == -1) {
-			perror("ERROR read socket");
+		ssize_t rc = recv(net->sock, buffer, sizeof(buffer) - 1, 0);
+		if (rc == SOCKET_ERROR) {
+			log_sock_error("ERROR recv socket");
 			goto error;
 		}
 		if (rc == 0) {
 			SDL_AtomicSet(&net->open, 0);
 			break;
 		} else {
-			message_t msg = {};
+			message_t msg = {0};
 			if (buffer[rc - 1]) {
 				fprintf(stderr, "ERROR: received message isn't null terminated\n");
 				goto error;
@@ -179,9 +215,9 @@ static int send_thread_proc(void *data) {
 				msg.move_target.row, msg.move_target.col
 			);
 
-			ssize_t wc = write(net->sock, buffer, msg_len + 1);
-			if (wc == -1) {
-				perror("ERROR write socket");
+			ssize_t wc = send(net->sock, buffer, msg_len + 1, 0);
+			if (wc == SOCKET_ERROR) {
+				log_sock_error("ERROR send socket");
 				goto error;
 			} else if (wc != msg_len + 1) {
 				fprintf(stderr, "ERROR: failed to write all bytes\n");
@@ -206,7 +242,16 @@ extern net_state_t *net_connect(net_mode_t mode, char *host, char *port) {
 	}
 	memset(net, 0, sizeof(net_state_t));
 
-	net->sock = -1;
+#ifdef _WIN32
+	WSADATA wsa_data;
+	int wsa_res = WSAStartup(MAKEWORD(2,2), &wsa_data);
+	if (wsa_res) {
+	    fprintf(stderr, "ERROR WSAStartup: %d\n", wsa_res);
+	    goto error;
+	}
+#endif
+
+	net->sock = INVALID_SOCKET;
 	switch (mode) {
 		case NET_SERVER:
 			net->sock = start_server(port);
@@ -215,7 +260,7 @@ extern net_state_t *net_connect(net_mode_t mode, char *host, char *port) {
 			net->sock = start_client(host, port);
 			break;
 	}
-	if (net->sock == -1)
+	if (net->sock == INVALID_SOCKET)
 		goto error;
 
 	SDL_AtomicSet(&net->open, 1);
@@ -232,8 +277,7 @@ extern net_state_t *net_connect(net_mode_t mode, char *host, char *port) {
 
 	return net;
 error:
-	// TODO what to do when a thread is running?
-	free(net);
+	net_quit(net);
 	return 0;
 }
 
@@ -241,19 +285,29 @@ extern void net_quit(net_state_t *net) {
 	int was_open = SDL_AtomicSet(&net->open, 0);
 	if (was_open) {
 		if (shutdown(net->sock, SHUT_WR))
-			perror("shutdown");
+			log_sock_error("shutdown");
 	}
 
 	int thread_res;
-	SDL_WaitThread(net->recv_thread, &thread_res);
-	if (thread_res)
-		fprintf(stderr, "receiver thread exit with error\n");
-	SDL_WaitThread(net->send_thread, &thread_res);
-	if (thread_res)
-		fprintf(stderr, "sender thread exit with error\n");
+	if (net->recv_thread) {
+		SDL_WaitThread(net->recv_thread, &thread_res);
+		if (thread_res)
+			fprintf(stderr, "receiver thread exit with error\n");
+	}
+	if (net->send_thread) {
+		SDL_WaitThread(net->send_thread, &thread_res);
+		if (thread_res)
+			fprintf(stderr, "sender thread exit with error\n");
+	}
 
-	if (close(net->sock) == -1)
-		perror("ERROR close");
+	if (net->sock != INVALID_SOCKET) {
+		if (closesocket(net->sock) == SOCKET_ERROR)
+			log_sock_error("ERROR closesocket");
+	}
+
+#ifdef _WIN32
+	WSACleanup();
+#endif
 
 	free(net);
 }

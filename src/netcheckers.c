@@ -3,6 +3,7 @@
  * http://boardgames.about.com/cs/checkersdraughts/ht/play_checkers.htm
  */
 #include <stdio.h>
+#include <string.h>
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 #include <SDL2_image/SDL_image.h>
@@ -93,7 +94,9 @@ static SDL_Texture *load_png_texture(char *path, char **error) {
 		texture = SDL_CreateTextureFromSurface(renderer, surface);
 		if (!texture)
 			*error = (char *)SDL_GetError();
-		SDL_FreeSurface(surface);
+#ifndef _WIN32
+		SDL_FreeSurface(surface); // TODO segfault on windows
+#endif
 	} else {
 		*error = (char *)IMG_GetError();
 	}
@@ -139,7 +142,7 @@ static void cell_to_rect(cell_pos_t cell, SDL_Rect *rect) {
 }
 
 static cell_pos_t point_to_cell(int x, int y) {
-	cell_pos_t result = {};
+	cell_pos_t result = {0};
 	if (local_color == PIECE_BLACK) {
 		result.row = (y - board_rect.y) / cell_size;
 		result.col = (x - board_rect.x) / cell_size;
@@ -220,7 +223,7 @@ static void find_move_at_direction(piece_moves_t *moves, piece_t *piece, int row
 // capture moves are returned. This function does not check the case when the
 // player is required to make a capture with a piece other than the piece tested.
 static piece_moves_t find_local_moves(piece_t *piece) {
-	piece_moves_t result = {};
+	piece_moves_t result = {0};
 
 	if (piece->color == PIECE_WHITE || piece->king) {
 		find_move_at_direction(&result, piece, 1, 1);
@@ -255,7 +258,7 @@ static piece_moves_t find_local_moves(piece_t *piece) {
 
 // This function finds the moves taking in consideration required captures
 static piece_moves_t find_valid_moves(piece_t *piece) {
-	piece_moves_t result = {};
+	piece_moves_t result = {0};
 	bool piece_can_move = true;
 	if (must_capture_count) {
 		piece_can_move = false;
@@ -321,13 +324,13 @@ static move_result_t perform_move(piece_t *piece, cell_pos_t target) {
 		bool can_move = false;
 		must_capture_count = 0;
 		for (int i = 0; i < 32; i++) {
-			piece_t *piece = pieces + i;
-			if (piece->color == current_turn && !piece->captured) {
-				piece_moves_t moves = find_local_moves(piece);
+			piece_t *test = pieces + i;
+			if (test->color == current_turn && !test->captured) {
+				piece_moves_t moves = find_local_moves(test);
 				if (moves.count) {
 					can_move = true;
 					if (moves.moves[0].capture) {
-						must_capture[must_capture_count++] = piece;
+						must_capture[must_capture_count++] = test;
 					}
 				}
 			}
@@ -348,7 +351,7 @@ static void log_error(char *prefix, const char *message) {
 }
 
 static startup_info_t startup_cmdline(int argc, char **argv) {
-	startup_info_t result = {};
+	startup_info_t result = {0};
 	if (argc == 3 && strcmp(argv[1], "server") == 0) {
 		result.success = true;
 		result.server_mode = true;
@@ -379,7 +382,7 @@ static void render(float dt) {
 
 	if (current_turn == local_color) {
 		if (selected_piece) {
-			SDL_Rect rect = {};
+			SDL_Rect rect = {0};
 			cell_to_rect(selected_piece->pos, &rect);
 			SDL_SetRenderDrawColor(renderer, 0x80, 0x80, 0xff, 0xa0);
 			SDL_RenderFillRect(renderer, &rect);
@@ -393,7 +396,7 @@ static void render(float dt) {
 			for (int i = 0; i < must_capture_count; i++) {
 				piece_t *piece = must_capture[i];
 				if (piece != selected_piece) {
-					SDL_Rect rect = {};
+					SDL_Rect rect = {0};
 					cell_to_rect(piece->pos, &rect);
 					SDL_RenderCopy(renderer, tex.textures.highlight, 0, &rect);
 				}
@@ -418,8 +421,8 @@ static void render(float dt) {
 				SDL_SetTextureAlphaMod(texture, 0xff);
 			}
 
-			SDL_Rect from_rect = {};
-			SDL_Rect to_rect = {};
+			SDL_Rect from_rect = {0};
+			SDL_Rect to_rect = {0};
 			cell_to_rect(animating_from, &from_rect);
 			cell_to_rect(animating_piece->pos, &to_rect);
 
@@ -435,7 +438,7 @@ static void render(float dt) {
 	for (int i = 0; i < ARRAY_SIZE(pieces); i++) {
 		piece_t *piece = pieces + i;
 		if (!piece->captured && piece != animating_piece) {
-			SDL_Rect rect = {};
+			SDL_Rect rect = {0};
 			cell_to_rect(piece->pos, &rect);
 			SDL_RenderCopy(renderer, texture_for_piece(piece), 0, &rect);
 		}
@@ -445,7 +448,7 @@ static void render(float dt) {
 		SDL_Texture *msg_tex = (current_turn == local_color) ? tex.textures.defeat : tex.textures.victory;
 		int twidth, theight;
 		SDL_QueryTexture(msg_tex, 0, 0, &twidth, &theight);
-		SDL_Rect msg_rect = {};
+		SDL_Rect msg_rect = {0};
 		msg_rect.w = twidth * scale_rate;
 		msg_rect.h = theight * scale_rate;
 		msg_rect.x = (render_width / 2) - (msg_rect.w / 2);
@@ -471,7 +474,7 @@ static void render(float dt) {
 		int twidth, theight;
 		SDL_QueryTexture(current_turn_tex, 0, 0, &twidth, &theight);
 
-		SDL_Rect turn_msg_rect = {};
+		SDL_Rect turn_msg_rect = {0};
 		turn_msg_rect.w = scale_rate * twidth;
 		turn_msg_rect.h = scale_rate * theight;
 		turn_msg_rect.x = (render_width / 2) - (turn_msg_rect.w / 2);
@@ -510,12 +513,12 @@ int main(int argc, char **argv) {
 		goto exit;
 	}
 
+
 #ifdef NETCHECKERS_XCODE_OSX
 	startup_info_t info = startup_cocoa();
 #else
 	startup_info_t info = startup_cmdline(argc, argv);
 #endif
-
 	if (!info.success)
 		goto exit;
 
@@ -546,7 +549,7 @@ int main(int argc, char **argv) {
 	MAIN_SDL_CHECK(SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND) == 0, "SDL_SetRenderDrawBlendMode SDL_BLENDMODE_BLEND");
 
 	char *error = 0;
-	char path[PATH_MAX];
+	char path[1024];
 	#define LOAD_TEXTURE_CHECKED(var, file) { \
 		sprintf(path, "%s/" file, info.assets_path); \
 		var = load_png_texture(path, &error); \
@@ -620,7 +623,7 @@ int main(int argc, char **argv) {
 		last_time = current_time;
 		float delta_time = (float)ellapsed_ms / 1000.0f;
 
-		SDL_Event event = {};
+		SDL_Event event = {0};
 		while (SDL_PollEvent(&event)) {
 			switch (event.type) {
 				case SDL_QUIT: {
@@ -634,7 +637,7 @@ int main(int argc, char **argv) {
 				case SDL_MOUSEBUTTONDOWN: {
 					#if 1
 					if (event.button.state == SDL_PRESSED && event.button.button == SDL_BUTTON_RIGHT) {
-						message_t net_msg = {};
+						message_t net_msg = {0};
 						net_msg.move_piece = cell_pos(5, 1);
 						net_msg.move_target = cell_pos(4, 0);
 						net_send_message(network, &net_msg);
@@ -664,7 +667,7 @@ int main(int argc, char **argv) {
 											available_moves = find_valid_moves(selected_piece);
 										}
 
-										message_t net_msg = {};
+										message_t net_msg = {0};
 										net_msg.move_piece = from_cell;
 										net_msg.move_target = clicked_cell;
 										if (!net_send_message(network, &net_msg)) {
