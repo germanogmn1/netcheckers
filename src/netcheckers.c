@@ -59,7 +59,7 @@ typedef struct {
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static textures_t tex;
-static net_state_t *network;
+static net_context_t *network;
 
 // Game logic state
 static bool game_over;
@@ -358,11 +358,11 @@ static startup_info_t startup_cmdline(int argc, char **argv) {
 	startup_info_t result = {0};
 	if (argc == 3 && strcmp(argv[1], "server") == 0) {
 		result.success = true;
-		result.server_mode = true;
+		result.net_mode = true;
 		strncpy(result.port, argv[2], sizeof(result.port));
 	} else if (argc == 4 && strcmp(argv[1], "client") == 0) {
 		result.success = true;
-		result.server_mode = false;
+		result.net_mode = false;
 		strncpy(result.host, argv[2], sizeof(result.host));
 		strncpy(result.port, argv[3], sizeof(result.port));
 	} else {
@@ -517,7 +517,6 @@ int main(int argc, char **argv) {
 		goto exit;
 	}
 
-
 #ifdef NETCHECKERS_XCODE_OSX
 	startup_info_t info = startup_cocoa();
 #else
@@ -526,8 +525,10 @@ int main(int argc, char **argv) {
 	if (!info.success)
 		goto exit;
 
-	net_mode_t net_mode = info.server_mode ? NET_SERVER : NET_CLIENT;
+    net_mode_t net_mode = info.net_mode;
+#ifndef NETCHECKERS_XCODE_OSX
 	network = net_connect(net_mode, info.host, info.port);
+#endif
 	if (!network)
 		goto exit;
 
@@ -695,7 +696,7 @@ int main(int argc, char **argv) {
 			}
 		}
 
-		if (!net_is_open(network)) {
+		if (net_get_state(network) == NET_RUNNING) {
 			fprintf(stderr, "Connection closed by %s\n", (net_mode == NET_SERVER) ? "client" : "server");
 			goto exit;
 		}
@@ -731,7 +732,7 @@ int main(int argc, char **argv) {
 	return_status = 0;
 exit:
 	if (network)
-		net_quit(network);
+		net_destroy(network);
 	for (int i = 0; i < ARRAY_SIZE(tex.array); i++) {
 		if (tex.array[i])
 			SDL_DestroyTexture(tex.array[i]);

@@ -6,8 +6,12 @@
     <objects>
         <customObject id="-2" userLabel="File's Owner" customClass="StartupWindow">
             <connections>
+                <outlet property="cancelWaitingButtton" destination="BH7-l5-sdo" id="8iq-FF-QgG"/>
                 <outlet property="hostField" destination="mOG-kw-amN" id="LYu-Mk-Qld"/>
                 <outlet property="hostLabel" destination="49M-l6-NZO" id="UIJ-ev-5ei"/>
+                <outlet property="loadingBar" destination="0AR-Fn-b4D" id="hIu-Iw-Ivb"/>
+                <outlet property="loadingMessage" destination="kaP-Y4-whP" id="0Qc-vY-Xv6"/>
+                <outlet property="loadingSheet" destination="1jU-cf-kQ3" id="G6U-ji-TQ6"/>
                 <outlet property="modeControl" destination="cB1-zV-Srm" id="tuv-2z-cLa"/>
                 <outlet property="portField" destination="s6i-MQ-YmO" id="ppM-lv-VoN"/>
                 <outlet property="window" destination="F0z-JX-Cv5" id="gIp-Ho-8D9"/>
@@ -132,7 +136,54 @@ DQ
             <connections>
                 <outlet property="delegate" destination="-2" id="0bl-1N-AYu"/>
             </connections>
-            <point key="canvasLocation" x="237" y="245.5"/>
+            <point key="canvasLocation" x="243" y="242.5"/>
+        </window>
+        <window title="Window" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" oneShot="NO" releasedWhenClosed="NO" showsToolbarButton="NO" visibleAtLaunch="NO" animationBehavior="default" id="1jU-cf-kQ3">
+            <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES" resizable="YES"/>
+            <windowPositionMask key="initialPositionMask" leftStrut="YES" rightStrut="YES" topStrut="YES" bottomStrut="YES"/>
+            <rect key="contentRect" x="131" y="158" width="111" height="111"/>
+            <rect key="screenRect" x="0.0" y="0.0" width="1440" height="877"/>
+            <view key="contentView" id="qPx-jF-imm">
+                <rect key="frame" x="0.0" y="0.0" width="111" height="111"/>
+                <autoresizingMask key="autoresizingMask"/>
+                <subviews>
+                    <textField horizontalHuggingPriority="251" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="kaP-Y4-whP">
+                        <rect key="frame" x="18" y="74" width="75" height="17"/>
+                        <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" alignment="center" placeholderString="message" id="ayc-yG-AMJ">
+                            <font key="font" metaFont="system"/>
+                            <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <progressIndicator maxValue="100" indeterminate="YES" style="bar" translatesAutoresizingMaskIntoConstraints="NO" id="0AR-Fn-b4D">
+                        <rect key="frame" x="20" y="47" width="71" height="20"/>
+                    </progressIndicator>
+                    <button verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="BH7-l5-sdo">
+                        <rect key="frame" x="14" y="9" width="83" height="32"/>
+                        <buttonCell key="cell" type="push" title="Cancel" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="Kb8-Ac-5uC">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="system"/>
+                            <string key="keyEquivalent" base64-UTF8="YES">
+Gw
+</string>
+                        </buttonCell>
+                        <connections>
+                            <action selector="cancelWaiting:" target="-2" id="Xe8-hW-bvE"/>
+                        </connections>
+                    </button>
+                </subviews>
+                <constraints>
+                    <constraint firstItem="BH7-l5-sdo" firstAttribute="centerX" secondItem="qPx-jF-imm" secondAttribute="centerX" id="1Si-08-aUX"/>
+                    <constraint firstItem="0AR-Fn-b4D" firstAttribute="leading" secondItem="qPx-jF-imm" secondAttribute="leading" constant="20" id="PeK-Pk-vhg"/>
+                    <constraint firstItem="kaP-Y4-whP" firstAttribute="leading" secondItem="qPx-jF-imm" secondAttribute="leading" constant="20" id="SKT-Ga-63G"/>
+                    <constraint firstAttribute="trailing" secondItem="0AR-Fn-b4D" secondAttribute="trailing" constant="20" id="WFA-Bc-jMU"/>
+                    <constraint firstItem="0AR-Fn-b4D" firstAttribute="top" secondItem="kaP-Y4-whP" secondAttribute="bottom" constant="8" id="nSP-cg-TLz"/>
+                    <constraint firstAttribute="trailing" secondItem="kaP-Y4-whP" secondAttribute="trailing" constant="20" id="nc5-MB-Sxy"/>
+                    <constraint firstAttribute="bottom" secondItem="BH7-l5-sdo" secondAttribute="bottom" constant="16" id="qrH-qw-ZTE"/>
+                    <constraint firstItem="kaP-Y4-whP" firstAttribute="top" secondItem="qPx-jF-imm" secondAttribute="top" constant="20" id="tFI-Pq-1wT"/>
+                </constraints>
+            </view>
+            <point key="canvasLocation" x="243.5" y="473.5"/>
         </window>
     </objects>
 </document>

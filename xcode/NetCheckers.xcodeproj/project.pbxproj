@@ -24,6 +24,7 @@
 		5D4FB2E61BE608EE00A21594 /* piece_white.png in Resources */ = {isa = PBXBuildFile; fileRef = 5D4FB2D21BE6084900A21594 /* piece_white.png */; };
 		5D4FB2E71BE608EE00A21594 /* player_turn.png in Resources */ = {isa = PBXBuildFile; fileRef = 5D4FB2D31BE6084900A21594 /* player_turn.png */; };
 		5D4FB2E81BE608EE00A21594 /* victory.png in Resources */ = {isa = PBXBuildFile; fileRef = 5D4FB2D41BE6084900A21594 /* victory.png */; };
+		5D5BEE731BE809A30041877C /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 5D5BEE751BE809A30041877C /* Localizable.strings */; };
 		5DE0B3171BE4D6DD0026D9CF /* SDL2.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5D5CAFCB1BE4C641003EBC3B /* SDL2.framework */; };
 /* End PBXBuildFile section */
 
@@ -45,6 +46,8 @@
 		5D4FB2D21BE6084900A21594 /* piece_white.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = piece_white.png; path = ../../assets/piece_white.png; sourceTree = "<group>"; };
 		5D4FB2D31BE6084900A21594 /* player_turn.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = player_turn.png; path = ../../assets/player_turn.png; sourceTree = "<group>"; };
 		5D4FB2D41BE6084900A21594 /* victory.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = victory.png; path = ../../assets/victory.png; sourceTree = "<group>"; };
+		5D5BEE771BE80A080041877C /* Base */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = Base; path = Base.lproj/Localizable.strings; sourceTree = "<group>"; };
+		5D5BEE781BE80A1D0041877C /* pt */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = pt; path = pt.lproj/Localizable.strings; sourceTree = "<group>"; };
 		5D5CAFCB1BE4C641003EBC3B /* SDL2.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SDL2.framework; path = /Library/Frameworks/SDL2.framework; sourceTree = "<absolute>"; };
 		5D5CAFCD1BE4C651003EBC3B /* SDL2_image.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SDL2_image.framework; path = /Library/Frameworks/SDL2_image.framework; sourceTree = "<absolute>"; };
 		5D5CAFCF1BE4C681003EBC3B /* common.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = common.h; path = ../../src/common.h; sourceTree = "<group>"; };
@@ -52,6 +55,7 @@
 		5D5CAFD11BE4C681003EBC3B /* network.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = network.c; path = ../../src/network.c; sourceTree = "<group>"; };
 		5D5CAFD21BE4C681003EBC3B /* network.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = network.h; path = ../../src/network.h; sourceTree = "<group>"; };
 		5D9DD5E81BE6151E00E8302A /* pt */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = pt; path = pt.lproj/MainMenu.strings; sourceTree = "<group>"; };
+		5DAE502B1BE91581006CC6AB /* startup.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = startup.h; path = ../../src/startup.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -93,6 +97,7 @@
 				5D066A761BE4C5E7008AB0A5 /* Assets.xcassets */,
 				5D066A781BE4C5E7008AB0A5 /* MainMenu.xib */,
 				5D4E3D3A1BE61CB5002F9E6F /* StartupWindow.xib */,
+				5D5BEE751BE809A30041877C /* Localizable.strings */,
 				5D066A7B1BE4C5E7008AB0A5 /* Info.plist */,
 			);
 			path = NetCheckers;
@@ -118,6 +123,7 @@
 		5D5CAFD51BE4C685003EBC3B /* src */ = {
 			isa = PBXGroup;
 			children = (
+				5DAE502B1BE91581006CC6AB /* startup.h */,
 				5D148ADE1BE5FF9A00E0B306 /* startup_cocoa.m */,
 				5D5CAFCF1BE4C681003EBC3B /* common.h */,
 				5D5CAFD01BE4C681003EBC3B /* netcheckers.c */,
@@ -198,6 +204,7 @@
 				5D4E3D3C1BE61CB5002F9E6F /* StartupWindow.xib in Resources */,
 				5D4FB2E81BE608EE00A21594 /* victory.png in Resources */,
 				5D066A771BE4C5E7008AB0A5 /* Assets.xcassets in Resources */,
+				5D5BEE731BE809A30041877C /* Localizable.strings in Resources */,
 				5D066A7A1BE4C5E7008AB0A5 /* MainMenu.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -234,6 +241,15 @@
 				5D4E3D3E1BE63785002F9E6F /* pt */,
 			);
 			name = StartupWindow.xib;
+			sourceTree = "<group>";
+		};
+		5D5BEE751BE809A30041877C /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				5D5BEE771BE80A080041877C /* Base */,
+				5D5BEE781BE80A1D0041877C /* pt */,
+			);
+			name = Localizable.strings;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */
