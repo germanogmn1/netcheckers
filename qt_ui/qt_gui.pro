@@ -9,14 +9,15 @@ QT       += core gui
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 TARGET = qt
-#TEMPLATE = app
 TEMPLATE = lib
 CONFIG += staticlib
 
-SOURCES +=\
-    startup.cpp
+HEADERS  += \
+    ../src/startup_qt.cpp \
+    ../src/startup.h
 
-HEADERS  += startup.cpp
+SOURCES += \
+    ../src/startup_qt.cpp
 
 FORMS    += startupwindow.ui \
     startuploadingdialog.ui

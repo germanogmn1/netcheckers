@@ -7,6 +7,8 @@
 #include "ui_startupwindow.h"
 #include "ui_startuploadingdialog.h"
 
+#include "../src/startup.h"
+
 class StartupWindow : public QMainWindow {
     Q_OBJECT
 public:
@@ -58,23 +60,21 @@ private:
     QTimer *timer;
 };
 
-#if 1
+// int main(int argc, char *argv[])
+
 extern "C"
-int startup(int argc, char *argv[])
-#else
-int main(int argc, char *argv[])
-#endif
-{
+startup_info_t startup(int argc, char **argv) {
+    startup_info_t result = {};
+
     QApplication a(argc, argv);
     StartupWindow w;
     w.show();
 
-    // return a.exec();
-    for (;;) {
+    while (w.isVisible()) {
         a.processEvents();
     }
 
-    return 0;
+    return result;
 }
 
-#include "moc_startup.cpp"
+#include "moc_startup_qt.cpp"

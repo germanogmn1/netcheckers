@@ -354,30 +354,6 @@ static void log_error(char *prefix, const char *message) {
 	fprintf(stderr, "ERROR %s: %s\n", prefix, message);
 }
 
-static startup_info_t startup_cmdline(int argc, char **argv) {
-	startup_info_t result = {0};
-	if (argc == 3 && strcmp(argv[1], "server") == 0) {
-		result.success = true;
-		result.server_mode = true;
-		strncpy(result.port, argv[2], sizeof(result.port));
-	} else if (argc == 4 && strcmp(argv[1], "client") == 0) {
-		result.success = true;
-		result.server_mode = false;
-		strncpy(result.host, argv[2], sizeof(result.host));
-		strncpy(result.port, argv[3], sizeof(result.port));
-	} else {
-		result.success = false;
-		fprintf(stderr,
-			"Usage:\n"
-			"    %s server PORT\n"
-			"    %s client HOST PORT\n",
-			argv[0], argv[0]
-		);
-	}
-	strcpy(result.assets_path, "assets");
-	return result;
-}
-
 static void render(float dt) {
 	SDL_SetRenderDrawColor(renderer, 0xde, 0xde, 0xde, 0xff);
 	SDL_RenderClear(renderer);
@@ -497,10 +473,6 @@ static void render(float dt) {
 	SDL_RenderPresent(renderer);
 }
 
-#ifdef NETCHECKERS_XCODE_OSX
-	startup_info_t startup_cocoa();
-#endif
-
 int main(int argc, char **argv) {
 	int return_status = 1;
 
@@ -517,12 +489,7 @@ int main(int argc, char **argv) {
 		goto exit;
 	}
 
-
-#ifdef NETCHECKERS_XCODE_OSX
-	startup_info_t info = startup_cocoa();
-#else
-	startup_info_t info = startup_cmdline(argc, argv);
-#endif
+	startup_info_t info = startup(argc, argv);
 	if (!info.success)
 		goto exit;
 

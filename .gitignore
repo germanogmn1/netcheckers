@@ -1,2 +1,4 @@
 netcheckers
 build
+build-*
+qt_ui/qt_gui.pro.user

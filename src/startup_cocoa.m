@@ -82,7 +82,7 @@ static enum { OPEN, STARTED, CANCELED } window_state;
 
 @end
 
-extern startup_info_t startup_cocoa() {
+extern startup_info_t startup(int argc, char **argv) {
     NSApplication *app = [NSApplication sharedApplication];
     NSNib *nib = [[NSNib alloc] initWithNibNamed:@"MainMenu" bundle:[NSBundle mainBundle]];
     [nib instantiateWithOwner:app topLevelObjects:nil];
