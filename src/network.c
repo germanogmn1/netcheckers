@@ -4,6 +4,10 @@
 
 #include "network.h"
 
+/*
+ * TODO nonblocking connect and getaddrinfo
+ */
+
 #ifdef _WIN32
 
 #include <winsock2.h>
@@ -11,12 +15,13 @@
 typedef SOCKET sock_t;
 typedef int ssize_t;
 #define SHUT_WR SD_BOTH
+#define sock_errno WSAGetLastError()
 char *sock_error_str() {
 	char *res;
 	int flags = FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS;
 	FormatMessageA(flags, 0, WSAGetLastError(), 0, &res, 0, 0);
-    return res;
-//	LocalFree(res); TODO net_destroy?
+	return res;
+//	LocalFree(res); TODO when to destroy this?
 }
 
 #else
@@ -33,8 +38,9 @@ typedef int sock_t;
 #define INVALID_SOCKET -1
 #define SOCKET_ERROR -1
 #define closesocket(sock) close(sock)
+#define sock_errno errno
 char *sock_error_str() {
-    return strerror(errno);
+	return strerror(errno);
 }
 
 #endif
@@ -50,7 +56,6 @@ typedef struct {
 
 static bool enqueue(queue_t *queue, message_t *item) {
 	bool result = false;
-	// printf("ENQ begin\n");
 	SDL_AtomicLock(&queue->lock);
 	if (queue->count < QUEUE_SIZE) {
 		queue->data[queue->last] = *item;
@@ -59,13 +64,11 @@ static bool enqueue(queue_t *queue, message_t *item) {
 		result = true;
 	}
 	SDL_AtomicUnlock(&queue->lock);
-	// printf("ENQ end\n");
 	return result;
 }
 
 static bool dequeue(queue_t *queue, message_t *message) {
 	bool result = false;
-	// printf("DEQ begin\n");
 	SDL_AtomicLock(&queue->lock);
 	if (queue->count) {
 		*message = queue->data[queue->first];
@@ -74,44 +77,7 @@ static bool dequeue(queue_t *queue, message_t *message) {
 		result = true;
 	}
 	SDL_AtomicUnlock(&queue->lock);
-	// printf("DEQ end\n");
 	return result;
-}
-
-static sock_t start_client(char *host, char *port) {
-	sock_t sock = INVALID_SOCKET;
-
-	struct addrinfo hints = {0};
-	hints.ai_flags = 0;
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = IPPROTO_TCP;
-	struct addrinfo *info;
-	int err = getaddrinfo(host, port, &hints, &info);
-	if (err) {
-		fprintf(stderr, "ERROR getaddrinfo: %s\n", gai_strerror(err));
-		goto exit;
-	}
-
-	sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (sock == INVALID_SOCKET) {
-//		log_sock_error("ERROR create socket");
-		goto exit;
-	}
-	printf("Connecting with server %s at port %s...\n", host, port);
-	if (connect(sock, info->ai_addr, info->ai_addrlen) == SOCKET_ERROR) {
-//		log_sock_error("ERROR connect");
-		if (closesocket(sock) == SOCKET_ERROR)
-//			log_sock_error("ERROR closesocket");
-		sock = INVALID_SOCKET;
-		goto exit;
-	}
-	printf("Connected with server\n");
-
-exit:
-	if (info)
-		freeaddrinfo(info);
-	return sock;
 }
 
 struct _net_context {
@@ -124,81 +90,124 @@ struct _net_context {
 	sock_t sock;
 	queue_t recv_queue;
 	queue_t send_queue;
-    net_error_t error;
-    char error_str[512];
+	net_error_t error;
+	char error_str[512];
 };
 
 static void set_error(net_context_t *net, net_error_t err, const char *fmt, ...) {
-    // TODO cleanup existing error?
-    net->error = err;
-    va_list args;
-    va_start(args, fmt);
-    vsnprintf(net->error_str, sizeof(net->error_str), fmt, args);
-    va_end(args);
+	// TODO cleanup existing error?
+	net->error = err;
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(net->error_str, sizeof(net->error_str), fmt, args);
+	va_end(args);
 }
 
 static int connection_proc(void *data) {
-   	net_context_t *net = data;
+	net_context_t *net = data;
 
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 1e3; // 1 ms
+	struct timeval timeout;
+	timeout.tv_sec = 0;
+	timeout.tv_usec = 1e3; // 1 ms
 
-    if (net->mode == NET_SERVER) {
-        sock_t server_sock = socket(AF_INET, SOCK_STREAM, 0);
-        if (server_sock == INVALID_SOCKET) {
-            set_error(net, NET_EUNKNOWN, "create socket: %s", sock_error_str());
-            goto server_cleanup;
-        }
-        struct sockaddr_in addr;
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons(atoi(net->port));
-        addr.sin_addr.s_addr = INADDR_ANY;
-        if (bind(server_sock, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR) {
-            net_error_t err = NET_EUNKNOWN;
-            if (errno == EACCES) {
-                err = NET_EPORTNOACCESS;
-            } else if (errno == EADDRINUSE) {
-                err = NET_EPORTINUSE;
-            }
-            set_error(net, err, "bind to port %s: %s", net->port, sock_error_str());
-            goto server_cleanup;
-        }
-        if (listen(server_sock, 1) == SOCKET_ERROR) {
-            set_error(net, NET_EUNKNOWN, "listen: %s", sock_error_str());
-            goto server_cleanup;
-        }
+	if (net->mode == NET_SERVER) {
+		sock_t server_sock = socket(AF_INET, SOCK_STREAM, 0);
+		if (server_sock == INVALID_SOCKET) {
+			set_error(net, NET_EUNKNOWN, "create socket: %s", sock_error_str());
+			goto server_cleanup;
+		}
+		struct sockaddr_in addr;
+		addr.sin_family = AF_INET;
+		addr.sin_port = htons(atoi(net->port));
+		addr.sin_addr.s_addr = INADDR_ANY;
+		if (bind(server_sock, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR) {
+			net_error_t err = NET_EUNKNOWN;
+			if (errno == EACCES) {
+				err = NET_EPORTNOACCESS;
+			} else if (errno == EADDRINUSE) {
+				err = NET_EPORTINUSE;
+			}
+			set_error(net, err, "bind to port %s: %s", net->port, sock_error_str());
+			goto server_cleanup;
+		}
+		if (listen(server_sock, 1) == SOCKET_ERROR) {
+			set_error(net, NET_EUNKNOWN, "listen: %s", sock_error_str());
+			goto server_cleanup;
+		}
 
-        for (;;) {
-            fd_set read_fds;
-            FD_ZERO(&read_fds);
-            FD_SET(server_sock, &read_fds);
-            if (select(FD_SETSIZE, &read_fds, 0, 0, &timeout) == SOCKET_ERROR) {
-                set_error(net, NET_EUNKNOWN, "select server: %s", sock_error_str());
-                goto server_cleanup;
-            }
-            if (!SDL_AtomicGet(&net->running)) {
-                goto server_cleanup;
-            } else if (FD_ISSET(server_sock, &read_fds)) {
-                break;
-            }
-        }
+		for (;;) {
+			fd_set read_fds;
+			FD_ZERO(&read_fds);
+			FD_SET(server_sock, &read_fds);
+			if (select(FD_SETSIZE, &read_fds, 0, 0, &timeout) == SOCKET_ERROR) {
+				set_error(net, NET_EUNKNOWN, "select server: %s", sock_error_str());
+				goto server_cleanup;
+			}
+			if (!SDL_AtomicGet(&net->running)) {
+				goto server_cleanup;
+			} else if (FD_ISSET(server_sock, &read_fds)) {
+				break;
+			}
+		}
 
-        net->sock = accept(server_sock, 0, 0);
-        if (net->sock == INVALID_SOCKET) {
-            set_error(net, NET_EUNKNOWN, "accept: %s", sock_error_str());
-            goto server_cleanup;
-        }
-    server_cleanup:
-        if (server_sock != INVALID_SOCKET) {
-            if (closesocket(server_sock) == SOCKET_ERROR) {
-                if (!net->error)
-                    set_error(net, NET_EUNKNOWN, "closesocket server: %s", sock_error_str());
-            }
-        }
-    } else {
-		net->sock = start_client(net->host, net->port);
-    }
+		net->sock = accept(server_sock, 0, 0);
+		if (net->sock == INVALID_SOCKET) {
+			set_error(net, NET_EUNKNOWN, "accept: %s", sock_error_str());
+			goto server_cleanup;
+		}
+	server_cleanup:
+		if (server_sock != INVALID_SOCKET) {
+			if (closesocket(server_sock) == SOCKET_ERROR) {
+				if (!net->error)
+					set_error(net, NET_EUNKNOWN, "closesocket server: %s", sock_error_str());
+			}
+		}
+	} else {
+		struct addrinfo hints = {0};
+		hints.ai_flags = 0;
+		hints.ai_family = AF_INET;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_TCP;
+		struct addrinfo *info;
+		int err = getaddrinfo(net->host, net->port, &hints, &info);
+		if (err) {
+			set_error(net,
+					  (err == EAI_NONAME ? NET_EDNSFAIL : NET_EUNKNOWN),
+					  "getaddrinfo: %s", gai_strerror(err));
+			goto client_cleanup;
+		}
+		net->sock = socket(AF_INET, SOCK_STREAM, 0);
+		if (net->sock == INVALID_SOCKET) {
+			set_error(net, NET_EUNKNOWN, "socket: %s", sock_error_str());
+			goto client_cleanup;
+		}
+		if (!SDL_AtomicGet(&net->running)) {
+			goto client_cleanup;
+		}
+//        for (;;) {
+//            fd_set write_fds;
+//            FD_ZERO(&write_fds);
+//            FD_SET(net->sock, &write_fds);
+//            if (select(FD_SETSIZE, 0, &write_fds, 0, &timeout) == SOCKET_ERROR) {
+//                set_error(net, NET_EUNKNOWN, "select server: %s", sock_error_str());
+//                goto client_cleanup;
+//            }
+//            if (!SDL_AtomicGet(&net->running)) {
+//                goto client_cleanup;
+//            } else if (FD_ISSET(net->sock, &write_fds)) {
+//                break;
+//            }
+//        }
+		if (connect(net->sock, info->ai_addr, info->ai_addrlen) == SOCKET_ERROR) {
+			net_error_t err = NET_EUNKNOWN;
+			if (sock_errno == ECONNREFUSED)
+				err = NET_ECONNREFUSED;
+			set_error(net, err, "connect: %s", sock_error_str());
+		}
+	client_cleanup:
+		if (info)
+			freeaddrinfo(info);
+	}
 
 	if (net->error || net->sock == INVALID_SOCKET)
 		goto exit;
@@ -229,7 +238,7 @@ static int connection_proc(void *data) {
 			}
 			message_t msg = {0};
 			if (buffer[rc - 1]) {
-                set_error(net, NET_EUNKNOWN, "received message isn't null terminated");
+				set_error(net, NET_EUNKNOWN, "received message isn't null terminated");
 				goto exit;
 			}
 			// parse message
@@ -240,11 +249,11 @@ static int connection_proc(void *data) {
 				&msg.move_target.row, &msg.move_target.col
 			);
 			if (status != 4) {
-                set_error(net, NET_EUNKNOWN, "failed to parse message");
+				set_error(net, NET_EUNKNOWN, "failed to parse message");
 				goto exit;
 			}
 			if (!enqueue(&net->recv_queue, &msg)) {
-                set_error(net, NET_EUNKNOWN, "receive queue is full");
+				set_error(net, NET_EUNKNOWN, "receive queue is full");
 				goto exit;
 			}
 		}
@@ -269,23 +278,23 @@ static int connection_proc(void *data) {
 		}
 	}
 exit:
-    if (net->error) {
-        SDL_AtomicSet(&net->state, NET_ERROR);
-        return 1;
-    } else {
-        SDL_AtomicSet(&net->state, NET_CLOSED);
-        return 0;
-    }
+	if (net->error) {
+		SDL_AtomicSet(&net->state, NET_ERROR);
+		return 1;
+	} else {
+		SDL_AtomicSet(&net->state, NET_CLOSED);
+		return 0;
+	}
 }
 
 extern net_context_t *net_init() {
 #ifdef _WIN32
-    WSADATA wsa_data;
-    int wsa_res = WSAStartup(MAKEWORD(2,2), &wsa_data);
-    if (wsa_res) {
-        fprintf(stderr, "ERROR WSAStartup: %d\n", wsa_res);
-        return 0;
-    }
+	WSADATA wsa_data;
+	int wsa_res = WSAStartup(MAKEWORD(2,2), &wsa_data);
+	if (wsa_res) {
+		fprintf(stderr, "ERROR WSAStartup: %d\n", wsa_res);
+		return 0;
+	}
 #endif
 
 	net_context_t *net = malloc(sizeof(net_context_t));
@@ -302,16 +311,17 @@ extern net_context_t *net_init() {
 }
 
 extern void net_start(net_context_t *net, net_mode_t mode, char *host, char *port) {
+	net->mode = mode;
 	strncpy(net->host, host, sizeof(net->host));
 	strncpy(net->port, port, sizeof(net->port));
 
 	SDL_AtomicSet(&net->running, 1);
-    SDL_AtomicSet(&net->state, NET_CONNECTING);
+	SDL_AtomicSet(&net->state, NET_CONNECTING);
 
 	net->thread = SDL_CreateThread(connection_proc, "network", net);
-    if (!net->thread) {
+	if (!net->thread) {
 		SDL_AtomicSet(&net->state, NET_ERROR);
-        set_error(net, NET_EUNKNOWN, "SDL_CreateThread: %s", SDL_GetError());
+		set_error(net, NET_EUNKNOWN, "SDL_CreateThread: %s", SDL_GetError());
 	}
 }
 
@@ -338,7 +348,7 @@ extern void net_destroy(net_context_t *net) {
 		net_stop(net);
 	free(net);
 #ifdef _WIN32
-    WSACleanup();
+	WSACleanup();
 #endif
 }
 
@@ -347,11 +357,11 @@ extern net_state_t net_get_state(net_context_t *net) {
 }
 
 extern net_error_t net_get_error(net_context_t *net) {
-    return net->error;
+	return net->error;
 }
 
 extern const char *net_error_str(net_context_t *net) {
-    return net->error_str;
+	return net->error_str;
 }
 
 extern bool net_poll_message(net_context_t *net, message_t *msg) {

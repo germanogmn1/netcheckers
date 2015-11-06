@@ -525,7 +525,7 @@ int main(int argc, char **argv) {
 	if (!info.success)
 		goto exit;
 
-    net_mode_t net_mode = info.net_mode;
+	net_mode_t net_mode = info.net_mode;
 #ifndef NETCHECKERS_XCODE_OSX
 	network = net_connect(net_mode, info.host, info.port);
 #endif

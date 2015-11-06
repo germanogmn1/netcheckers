@@ -125,17 +125,25 @@ static startup_info_t info;
         } else if (state == NET_ERROR) {
             NSAlert *alert = [[NSAlert alloc] init];
             switch (net_get_error(info.network)) {
-                case NET_EUNKNOWN:
-                    assert(0);
-                    break;
                 case NET_ENONE:
-                    assert(0);
+                    [NSException raise:@"Invalid state"
+                                format:@"error state but no error is set"];
+                    break;
+                case NET_EUNKNOWN:
+                    [NSException raise:@"Failed to start network"
+                                format:@"%s", net_error_str(info.network)];
                     break;
                 case NET_EPORTINUSE:
                     [alert setInformativeText:@"NET_EPORTINUSE"];
                     break;
                 case NET_EPORTNOACCESS:
                     [alert setInformativeText:@"NET_EPORTNOACCESS"];
+                    break;
+                case NET_ECONNREFUSED:
+                    [alert setInformativeText:@"NET_ECONNREFUSED"];
+                    break;
+                case NET_EDNSFAIL:
+                    [alert setInformativeText:@"NET_EDNSFAIL"];
                     break;
             }
             [alert setMessageText:@"Error"];
@@ -153,7 +161,6 @@ static startup_info_t info;
 - (void)terminate:(id)sender {
     net_destroy(info.network);
     window_open = false;
-    printf("terminated\n");
 }
 @end
 
@@ -183,11 +190,9 @@ extern startup_info_t startup_cocoa() {
     } else if (state == NET_CLOSED || state == NET_ERROR) {
         info.success = false;
     } else {
-        assert(0);
-        // invalid state NET_CONNECTING
+        [NSException raise:@"Invalid state"
+                    format:@"Startup window closed but networking is running"];
     }
-
-    exit(123);
 
     return info;
 }
