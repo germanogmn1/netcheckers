@@ -314,6 +314,8 @@ extern void net_start(net_context_t *net, net_mode_t mode, char *host, char *por
 	net->mode = mode;
 	strncpy(net->host, host, sizeof(net->host));
 	strncpy(net->port, port, sizeof(net->port));
+	net->error = NET_ENONE;
+	net->error_str[0] = '\0';
 
 	SDL_AtomicSet(&net->running, 1);
 	SDL_AtomicSet(&net->state, NET_CONNECTING);

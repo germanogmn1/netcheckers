@@ -8,3 +8,5 @@ typedef struct {
 	char port[6];
 	char assets_path[1024];
 } startup_info_t;
+
+startup_info_t startup(int argc, char **argv);

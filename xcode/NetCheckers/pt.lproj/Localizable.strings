@@ -1,3 +1,2 @@
 "server_waiting" = "Esperando por conexão na porta %s...";
-//"server_waiting" = "Esperando por conexão na portaEsperando por conexão na porta %s...";
-//"server_waiting" = "Esperando %s...";
+"client_waiting" = "Conectando com %s:%s...";

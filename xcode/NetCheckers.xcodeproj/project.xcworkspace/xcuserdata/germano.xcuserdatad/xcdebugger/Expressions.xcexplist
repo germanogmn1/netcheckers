@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VariablesViewState
+   version = "1.0">
+   <ContextStates>
+      <ContextState
+         contextName = "connection_proc:network.c">
+         <PersistentStrings>
+            <PersistentString
+               value = "(net_state_t)net-&gt;state.value">
+            </PersistentString>
+         </PersistentStrings>
+      </ContextState>
+      <ContextState
+         contextName = "main:netcheckers.c">
+      </ContextState>
+   </ContextStates>
+</VariablesViewState>

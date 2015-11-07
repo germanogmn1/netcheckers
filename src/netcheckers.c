@@ -354,30 +354,6 @@ static void log_error(char *prefix, const char *message) {
 	fprintf(stderr, "ERROR %s: %s\n", prefix, message);
 }
 
-static startup_info_t startup_cmdline(int argc, char **argv) {
-	startup_info_t result = {0};
-	if (argc == 3 && strcmp(argv[1], "server") == 0) {
-		result.success = true;
-		result.net_mode = true;
-		strncpy(result.port, argv[2], sizeof(result.port));
-	} else if (argc == 4 && strcmp(argv[1], "client") == 0) {
-		result.success = true;
-		result.net_mode = false;
-		strncpy(result.host, argv[2], sizeof(result.host));
-		strncpy(result.port, argv[3], sizeof(result.port));
-	} else {
-		result.success = false;
-		fprintf(stderr,
-			"Usage:\n"
-			"    %s server PORT\n"
-			"    %s client HOST PORT\n",
-			argv[0], argv[0]
-		);
-	}
-	strcpy(result.assets_path, "assets");
-	return result;
-}
-
 static void render(float dt) {
 	SDL_SetRenderDrawColor(renderer, 0xde, 0xde, 0xde, 0xff);
 	SDL_RenderClear(renderer);
@@ -497,12 +473,12 @@ static void render(float dt) {
 	SDL_RenderPresent(renderer);
 }
 
-#ifdef NETCHECKERS_XCODE_OSX
-	startup_info_t startup_cocoa();
-#endif
-
 int main(int argc, char **argv) {
 	int return_status = 1;
+
+	startup_info_t info = startup(argc, argv);
+	if (!info.success)
+		goto exit;
 
 	#define MAIN_SDL_CHECK(expression, error_prefix) { \
 		if (!(expression)) { \
@@ -517,33 +493,24 @@ int main(int argc, char **argv) {
 		goto exit;
 	}
 
-#ifdef NETCHECKERS_XCODE_OSX
-	startup_info_t info = startup_cocoa();
-#else
-	startup_info_t info = startup_cmdline(argc, argv);
-#endif
-	if (!info.success)
-		goto exit;
-
+	network = info.network;
 	net_mode_t net_mode = info.net_mode;
-#ifndef NETCHECKERS_XCODE_OSX
-	network = net_connect(net_mode, info.host, info.port);
-#endif
-	if (!network)
-		goto exit;
 
 	MAIN_SDL_CHECK(SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "2"), "SDL_SetHint SDL_HINT_RENDER_SCALE_QUALITY");
 
 	char wtitle[256];
 	if (net_mode == NET_SERVER) {
-		snprintf(wtitle, sizeof(wtitle), "netcheckers - server (%s)", info.port);
+		snprintf(wtitle, sizeof(wtitle), "NetCheckers - server (%s)", info.port);
 	} else {
-		snprintf(wtitle, sizeof(wtitle), "netcheckers - client (%s:%s)", info.host, info.port);
+		snprintf(wtitle, sizeof(wtitle), "NetCheckers - client (%s:%s)", info.host, info.port);
 	}
 	window = SDL_CreateWindow(
 		wtitle,
-		// SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+#if 1
+		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+#else
 		(net_mode == NET_SERVER ? 10 : window_width + 20), SDL_WINDOWPOS_CENTERED,
+#endif
 		window_width, window_height,
 		SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI
 	);
@@ -696,8 +663,16 @@ int main(int argc, char **argv) {
 			}
 		}
 
-		if (net_get_state(network) == NET_RUNNING) {
-			fprintf(stderr, "Connection closed by %s\n", (net_mode == NET_SERVER) ? "client" : "server");
+		if (net_get_state(network) != NET_RUNNING) {
+			int err = SDL_ShowSimpleMessageBox(
+				SDL_MESSAGEBOX_ERROR,
+				"Erro - Conexão Interrompida",
+				"A conexão foi interrompida pelo adversário",
+				window
+			);
+			if (err) {
+				log_error("SDL_ShowSimpleMessageBox invalid movement", SDL_GetError());
+			}
 			goto exit;
 		}
 

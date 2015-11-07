@@ -47,7 +47,6 @@
 }
 @end
 
-static bool window_open;
 static startup_info_t info;
 
 @interface StartupWindow : NSWindowController
@@ -78,6 +77,7 @@ static startup_info_t info;
     [portField setIntValue:2432];
     [self modeChanged:modeControl];
 
+    self.window.releasedWhenClosed = YES;
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(terminate:)
                                                  name:NSWindowWillCloseNotification
@@ -98,8 +98,12 @@ static startup_info_t info;
     sprintf(info.port, "%d", portField.intValue);
     strcpy(info.assets_path, [NSBundle mainBundle].resourcePath.UTF8String);
 
-    NSString *tmpl = NSLocalizedString(@"server_waiting", nil);
-    NSString *message = [NSString stringWithFormat:tmpl, info.port];
+    NSString *message;
+    if (info.net_mode == NET_SERVER)
+        message = [NSString stringWithFormat:NSLocalizedString(@"server_waiting", nil), info.port];
+    else
+        message = [NSString stringWithFormat:NSLocalizedString(@"client_waiting", nil), info.host, info.port];
+
     [loadingMessage setStringValue:message];
     [loadingBar startAnimation:nil];
 
@@ -116,12 +120,12 @@ static startup_info_t info;
 }
 - (void)pollNetwork {
     net_state_t state = net_get_state(info.network);
-    // TODO handle other states
     if (state != NET_CONNECTING) {
         [timer invalidate];
         [self.window endSheet:loadingSheet];
+
         if (state == NET_RUNNING) {
-            window_open = false;
+            [self close];
         } else if (state == NET_ERROR) {
             NSAlert *alert = [[NSAlert alloc] init];
             switch (net_get_error(info.network)) {
@@ -155,34 +159,27 @@ static startup_info_t info;
     }
 }
 - (IBAction)cancelWaiting:(NSButton *)sender {
-    cancelWaitingButtton.enabled = false;
     net_stop(info.network);
 }
 - (void)terminate:(id)sender {
-    net_destroy(info.network);
-    window_open = false;
+    [NSApp stop:self];
+    [NSApp activateIgnoringOtherApps:YES];
 }
 @end
 
-extern startup_info_t startup_cocoa() {
+extern startup_info_t startup(int argc, char **argv) {
     info.network = net_init();
 
     NSApplication *app = [NSApplication sharedApplication];
+
     NSNib *nib = [[NSNib alloc] initWithNibNamed:@"MainMenu" bundle:[NSBundle mainBundle]];
     [nib instantiateWithOwner:app topLevelObjects:nil];
 
     StartupWindow *startWindow = [[StartupWindow alloc] initWithWindowNibName:@"StartupWindow"];
     [startWindow showWindow:nil];
+    [startWindow.window makeKeyAndOrderFront:nil];
 
-    window_open = true;
-    while (window_open) {
-        NSEvent *event = [app nextEventMatchingMask:NSAnyEventMask
-                                          untilDate:[NSDate distantFuture]
-                                             inMode:NSDefaultRunLoopMode
-                                            dequeue:YES];
-        [app sendEvent:event];
-        [app updateWindows];
-    }
+    [app run];
 
     net_state_t state = net_get_state(info.network);
     if (state == NET_RUNNING) {
