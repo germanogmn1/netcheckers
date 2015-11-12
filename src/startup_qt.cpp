@@ -3,6 +3,7 @@
 #include <QTimer>
 #include <QDesktopWidget>
 #include <QDialog>
+#include <stdio.h>
 
 #include "ui_startupwindow.h"
 #include "ui_startuploadingdialog.h"
@@ -12,11 +13,12 @@
 class StartupWindow : public QMainWindow {
 	Q_OBJECT
 public:
-	explicit StartupWindow(QWidget *parent = 0) : QMainWindow(parent),
+	explicit StartupWindow(startup_info_t *info, QWidget *parent = 0) : QMainWindow(parent),
 		ui(new Ui::StartupWindow),
 		dialog_ui(new Ui::StartupLoadingDialog),
 		dialog(new QDialog(0,0)),
-		timer(new QTimer(this))
+		timer(new QTimer(this)),
+		info(info)
 	{
 		ui->setupUi(this);
 		dialog_ui->setupUi(dialog);
@@ -41,33 +43,59 @@ private slots:
 		ui->hostLabel->setDisabled(disable);
 	}
 	void on_startButton_clicked() {
-		qDebug("Start!");
+		info->net_mode = (ui->modeComboBox->currentIndex() == 0) ? NET_SERVER : NET_CLIENT;
+		strncpy(info->host, ui->hostLineEdit->text().toUtf8().data(), sizeof(info->host));
+		snprintf(info->port, sizeof(info->port), "%d", ui->portSpinBox->value());
+printf("mode: %d\n", info->net_mode);
+		net_start(info->network, info->net_mode, info->host, info->port);
 
 		timer->start(50);
 		dialog->show();
 	}
 	void cancelLoading() {
-		qDebug("Cancel loading!");
-		timer->stop();
+		net_stop(info->network);
 	}
 	void pollNetwork() {
-		qDebug("poll");
+		net_state_t state = net_get_state(info->network);
+		if (state != NET_CONNECTING) {
+			printf("state: %d\n", state);
+			timer->stop();
+			dialog->hide();
+			if (state == NET_RUNNING) {
+				close();
+			} else if (state == NET_ERROR) {
+				switch (net_get_error(info->network)) {
+					case NET_EUNKNOWN:
+						printf("ERROR: NET_EUNKNOWN\n");
+						break;
+					case NET_ENONE:
+						printf("ERROR: NET_ENONE\n");
+						break;
+					case NET_EPORTINUSE:
+						printf("ERROR: NET_EPORTINUSE\n");
+						break;
+					case NET_EPORTNOACCESS:
+						printf("ERROR: NET_EPORTNOACCESS\n");
+						break;
+				}
+			}
+		}
 	}
 private:
 	Ui::StartupWindow *ui;
 	Ui::StartupLoadingDialog *dialog_ui;
 	QDialog *dialog;
 	QTimer *timer;
+	startup_info_t *info;
 };
-
-// int main(int argc, char *argv[])
 
 extern "C"
 startup_info_t startup(int argc, char **argv) {
 	startup_info_t result = {};
+	result.network = net_init();
 
 	QApplication a(argc, argv);
-	StartupWindow w;
+	StartupWindow w(&result);
 	w.show();
 
 	while (w.isVisible()) {

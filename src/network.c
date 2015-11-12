@@ -302,6 +302,7 @@ extern net_context_t *net_init() {
 }
 
 extern void net_start(net_context_t *net, net_mode_t mode, char *host, char *port) {
+	net->mode = mode;
 	strncpy(net->host, host, sizeof(net->host));
 	strncpy(net->port, port, sizeof(net->port));
 
