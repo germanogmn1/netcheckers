@@ -59,7 +59,7 @@ typedef struct {
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static textures_t tex;
-static net_state_t *network;
+static net_context_t *network;
 
 // Game logic state
 static bool game_over;
@@ -489,16 +489,16 @@ int main(int argc, char **argv) {
 		goto exit;
 	}
 
+	MAIN_SDL_CHECK(SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "2"), "SDL_SetHint SDL_HINT_RENDER_SCALE_QUALITY");
+
 	startup_info_t info = startup(argc, argv);
 	if (!info.success)
 		goto exit;
 
-	net_mode_t net_mode = info.server_mode ? NET_SERVER : NET_CLIENT;
-	network = net_connect(net_mode, info.host, info.port);
+	net_mode_t net_mode = info.net_mode;
+	network = info.network;
 	if (!network)
 		goto exit;
-
-	MAIN_SDL_CHECK(SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "2"), "SDL_SetHint SDL_HINT_RENDER_SCALE_QUALITY");
 
 	char wtitle[256];
 	if (net_mode == NET_SERVER) {
@@ -662,7 +662,7 @@ int main(int argc, char **argv) {
 			}
 		}
 
-		if (!net_is_open(network)) {
+		if (net_get_state(network) == NET_RUNNING) {
 			fprintf(stderr, "Connection closed by %s\n", (net_mode == NET_SERVER) ? "client" : "server");
 			goto exit;
 		}
@@ -698,7 +698,7 @@ int main(int argc, char **argv) {
 	return_status = 0;
 exit:
 	if (network)
-		net_quit(network);
+		net_destroy(network);
 	for (int i = 0; i < ARRAY_SIZE(tex.array); i++) {
 		if (tex.array[i])
 			SDL_DestroyTexture(tex.array[i]);
