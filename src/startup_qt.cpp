@@ -62,20 +62,22 @@ printf("mode: %d\n", info->net_mode);
 			timer->stop();
 			dialog->hide();
 			if (state == NET_RUNNING) {
+				info->success = true;
 				close();
 			} else if (state == NET_ERROR) {
+				info->success = false;
 				switch (net_get_error(info->network)) {
 					case NET_EUNKNOWN:
-						printf("ERROR: NET_EUNKNOWN\n");
+						printf("ERROR: NET_EUNKNOWN '%s'\n", net_error_str(info->network));
 						break;
 					case NET_ENONE:
-						printf("ERROR: NET_ENONE\n");
+						printf("ERROR: NET_ENONE '%s'\n", net_error_str(info->network));
 						break;
 					case NET_EPORTINUSE:
-						printf("ERROR: NET_EPORTINUSE\n");
+						printf("ERROR: NET_EPORTINUSE '%s'\n", net_error_str(info->network));
 						break;
 					case NET_EPORTNOACCESS:
-						printf("ERROR: NET_EPORTNOACCESS\n");
+						printf("ERROR: NET_EPORTNOACCESS '%s'\n", net_error_str(info->network));
 						break;
 				}
 			}
@@ -101,6 +103,8 @@ startup_info_t startup(int argc, char **argv) {
 	while (w.isVisible()) {
 		a.processEvents();
 	}
+
+	strcpy(result.assets_path, "assets");
 
 	return result;
 }

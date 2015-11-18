@@ -662,7 +662,7 @@ int main(int argc, char **argv) {
 			}
 		}
 
-		if (net_get_state(network) == NET_RUNNING) {
+		if (net_get_state(network) != NET_RUNNING) {
 			fprintf(stderr, "Connection closed by %s\n", (net_mode == NET_SERVER) ? "client" : "server");
 			goto exit;
 		}
