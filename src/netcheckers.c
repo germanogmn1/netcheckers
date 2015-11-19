@@ -497,19 +497,20 @@ int main(int argc, char **argv) {
 
 	net_mode_t net_mode = info.net_mode;
 	network = info.network;
-	if (!network)
-		goto exit;
 
 	char wtitle[256];
 	if (net_mode == NET_SERVER) {
-		snprintf(wtitle, sizeof(wtitle), "netcheckers - server (%s)", info.port);
+		snprintf(wtitle, sizeof(wtitle), "NetCheckers - server (%s)", info.port);
 	} else {
-		snprintf(wtitle, sizeof(wtitle), "netcheckers - client (%s:%s)", info.host, info.port);
+		snprintf(wtitle, sizeof(wtitle), "NetCheckers - client (%s:%s)", info.host, info.port);
 	}
 	window = SDL_CreateWindow(
 		wtitle,
-		// SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+#if 1
+		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+#else
 		(net_mode == NET_SERVER ? 10 : window_width + 20), SDL_WINDOWPOS_CENTERED,
+#endif
 		window_width, window_height,
 		SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI
 	);
@@ -663,7 +664,15 @@ int main(int argc, char **argv) {
 		}
 
 		if (net_get_state(network) != NET_RUNNING) {
-			fprintf(stderr, "Connection closed by %s\n", (net_mode == NET_SERVER) ? "client" : "server");
+			int err = SDL_ShowSimpleMessageBox(
+				SDL_MESSAGEBOX_ERROR,
+				"Erro - Conexão Interrompida",
+				"A conexão foi interrompida pelo adversário",
+				window
+			);
+			if (err) {
+				log_error("SDL_ShowSimpleMessageBox invalid movement", SDL_GetError());
+			}
 			goto exit;
 		}
 

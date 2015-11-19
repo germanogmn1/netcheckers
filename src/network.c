@@ -4,6 +4,10 @@
 
 #include "network.h"
 
+/*
+ * TODO nonblocking connect and getaddrinfo
+ */
+
 #ifdef _WIN32
 
 #include <winsock2.h>
@@ -11,12 +15,13 @@
 typedef SOCKET sock_t;
 typedef int ssize_t;
 #define SHUT_WR SD_BOTH
+#define sock_errno WSAGetLastError()
 char *sock_error_str() {
 	char *res;
 	int flags = FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS;
 	FormatMessageA(flags, 0, WSAGetLastError(), 0, &res, 0, 0);
 	return res;
-//	LocalFree(res); TODO net_destroy?
+	// LocalFree(res); TODO when to destroy this?
 }
 
 #else
@@ -33,6 +38,7 @@ typedef int sock_t;
 #define INVALID_SOCKET -1
 #define SOCKET_ERROR -1
 #define closesocket(sock) close(sock)
+#define sock_errno errno
 char *sock_error_str() {
 	return strerror(errno);
 }
@@ -50,7 +56,6 @@ typedef struct {
 
 static bool enqueue(queue_t *queue, message_t *item) {
 	bool result = false;
-	// printf("ENQ begin\n");
 	SDL_AtomicLock(&queue->lock);
 	if (queue->count < QUEUE_SIZE) {
 		queue->data[queue->last] = *item;
@@ -59,13 +64,11 @@ static bool enqueue(queue_t *queue, message_t *item) {
 		result = true;
 	}
 	SDL_AtomicUnlock(&queue->lock);
-	// printf("ENQ end\n");
 	return result;
 }
 
 static bool dequeue(queue_t *queue, message_t *message) {
 	bool result = false;
-	// printf("DEQ begin\n");
 	SDL_AtomicLock(&queue->lock);
 	if (queue->count) {
 		*message = queue->data[queue->first];
@@ -74,44 +77,7 @@ static bool dequeue(queue_t *queue, message_t *message) {
 		result = true;
 	}
 	SDL_AtomicUnlock(&queue->lock);
-	// printf("DEQ end\n");
 	return result;
-}
-
-static sock_t start_client(char *host, char *port) {
-	sock_t sock = INVALID_SOCKET;
-
-	struct addrinfo hints = {0};
-	hints.ai_flags = 0;
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = IPPROTO_TCP;
-	struct addrinfo *info;
-	int err = getaddrinfo(host, port, &hints, &info);
-	if (err) {
-		fprintf(stderr, "ERROR getaddrinfo: %s\n", gai_strerror(err));
-		goto exit;
-	}
-
-	sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (sock == INVALID_SOCKET) {
-//		log_sock_error("ERROR create socket");
-		goto exit;
-	}
-	printf("Connecting with server %s at port %s...\n", host, port);
-	if (connect(sock, info->ai_addr, info->ai_addrlen) == SOCKET_ERROR) {
-//		log_sock_error("ERROR connect");
-		if (closesocket(sock) == SOCKET_ERROR)
-//			log_sock_error("ERROR closesocket");
-		sock = INVALID_SOCKET;
-		goto exit;
-	}
-	printf("Connected with server\n");
-
-exit:
-	if (info)
-		freeaddrinfo(info);
-	return sock;
 }
 
 struct _net_context {
@@ -197,7 +163,49 @@ static int connection_proc(void *data) {
 			}
 		}
 	} else {
-		net->sock = start_client(net->host, net->port);
+		struct addrinfo hints = {0};
+		hints.ai_flags = 0;
+		hints.ai_family = AF_INET;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_TCP;
+		struct addrinfo *info;
+		int err = getaddrinfo(net->host, net->port, &hints, &info);
+		if (err) {
+			net_error_t net_err = (err == EAI_NONAME) ? NET_EDNSFAIL : NET_EUNKNOWN;
+			set_error(net, net_err, "getaddrinfo: %s", gai_strerror(err));
+			goto client_cleanup;
+		}
+		net->sock = socket(AF_INET, SOCK_STREAM, 0);
+		if (net->sock == INVALID_SOCKET) {
+			set_error(net, NET_EUNKNOWN, "socket: %s", sock_error_str());
+			goto client_cleanup;
+		}
+		if (!SDL_AtomicGet(&net->running)) {
+			goto client_cleanup;
+		}
+//        for (;;) {
+//            fd_set write_fds;
+//            FD_ZERO(&write_fds);
+//            FD_SET(net->sock, &write_fds);
+//            if (select(FD_SETSIZE, 0, &write_fds, 0, &timeout) == SOCKET_ERROR) {
+//                set_error(net, NET_EUNKNOWN, "select server: %s", sock_error_str());
+//                goto client_cleanup;
+//            }
+//            if (!SDL_AtomicGet(&net->running)) {
+//                goto client_cleanup;
+//            } else if (FD_ISSET(net->sock, &write_fds)) {
+//                break;
+//            }
+//        }
+		if (connect(net->sock, info->ai_addr, info->ai_addrlen) == SOCKET_ERROR) {
+			net_error_t err = NET_EUNKNOWN;
+			if (sock_errno == ECONNREFUSED)
+				err = NET_ECONNREFUSED;
+			set_error(net, err, "connect: %s", sock_error_str());
+		}
+	client_cleanup:
+		if (info)
+			freeaddrinfo(info);
 	}
 
 	if (net->error || net->sock == INVALID_SOCKET)
@@ -305,6 +313,8 @@ extern void net_start(net_context_t *net, net_mode_t mode, char *host, char *por
 	net->mode = mode;
 	strncpy(net->host, host, sizeof(net->host));
 	strncpy(net->port, port, sizeof(net->port));
+	net->error = NET_ENONE;
+	net->error_str[0] = '\0';
 
 	SDL_AtomicSet(&net->running, 1);
 	SDL_AtomicSet(&net->state, NET_CONNECTING);

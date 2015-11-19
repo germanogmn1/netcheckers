@@ -1,1 +1,2 @@
 "server_waiting" = "Waiting for connection on port %s...";
+"client_waiting" = "Connecting with %s:%s...";

@@ -23,6 +23,8 @@ typedef enum {
 	NET_EUNKNOWN,
 	NET_EPORTNOACCESS,
 	NET_EPORTINUSE,
+	NET_ECONNREFUSED,
+	NET_EDNSFAIL,
 } net_error_t;
 
 net_error_t net_get_error(net_context_t *net);
