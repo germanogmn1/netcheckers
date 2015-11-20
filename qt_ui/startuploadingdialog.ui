@@ -11,13 +11,13 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>Connecting...</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QLabel" name="label">
      <property name="text">
-      <string>Waiting for connections on port 1234...</string>
+      <string>(loading message)</string>
      </property>
      <property name="alignment">
       <set>Qt::AlignCenter</set>

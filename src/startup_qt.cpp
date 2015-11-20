@@ -3,6 +3,9 @@
 #include <QTimer>
 #include <QDesktopWidget>
 #include <QDialog>
+#include <QLocale>
+#include <QTranslator>
+#include <QTextCodec>
 #include <stdio.h>
 
 #include "ui_startupwindow.h"
@@ -16,7 +19,7 @@ public:
 	explicit StartupWindow(startup_info_t *info, QWidget *parent = 0) : QMainWindow(parent),
 		ui(new Ui::StartupWindow),
 		dialog_ui(new Ui::StartupLoadingDialog),
-		dialog(new QDialog(0,0)),
+		dialog(new QDialog(0, 0)),
 		timer(new QTimer(this)),
 		info(info)
 	{
@@ -46,11 +49,17 @@ private slots:
 		info->net_mode = (ui->modeComboBox->currentIndex() == 0) ? NET_SERVER : NET_CLIENT;
 		strncpy(info->host, ui->hostLineEdit->text().toUtf8().data(), sizeof(info->host));
 		snprintf(info->port, sizeof(info->port), "%d", ui->portSpinBox->value());
-printf("mode: %d\n", info->net_mode);
 		net_start(info->network, info->net_mode, info->host, info->port);
 
-		timer->start(50);
+		QString loadingText;
+		if (info->net_mode == NET_SERVER)
+			loadingText = QString(tr("Waiting for connections on port %1...")).arg(info->port);
+		else
+			loadingText = QString(tr("Connecting on %1 at port %2...")).arg(info->host).arg(info->port);
+
+		dialog_ui->label->setText(loadingText);
 		dialog->show();
+		timer->start(50);
 	}
 	void cancelLoading() {
 		net_stop(info->network);
@@ -58,7 +67,6 @@ printf("mode: %d\n", info->net_mode);
 	void pollNetwork() {
 		net_state_t state = net_get_state(info->network);
 		if (state != NET_CONNECTING) {
-			printf("state: %d\n", state);
 			timer->stop();
 			dialog->hide();
 			if (state == NET_RUNNING) {
@@ -67,17 +75,20 @@ printf("mode: %d\n", info->net_mode);
 			} else if (state == NET_ERROR) {
 				info->success = false;
 				switch (net_get_error(info->network)) {
+					case NET_ECONNREFUSED:
+						fprintf(stderr, "ERROR: NET_ECONNREFUSED '%s'\n", net_error_str(info->network));
+						break;
 					case NET_EUNKNOWN:
-						printf("ERROR: NET_EUNKNOWN '%s'\n", net_error_str(info->network));
+						fprintf(stderr, "ERROR: NET_EUNKNOWN '%s'\n", net_error_str(info->network));
 						break;
 					case NET_ENONE:
-						printf("ERROR: NET_ENONE '%s'\n", net_error_str(info->network));
+						fprintf(stderr, "ERROR: NET_ENONE '%s'\n", net_error_str(info->network));
 						break;
 					case NET_EPORTINUSE:
-						printf("ERROR: NET_EPORTINUSE '%s'\n", net_error_str(info->network));
+						fprintf(stderr, "ERROR: NET_EPORTINUSE '%s'\n", net_error_str(info->network));
 						break;
 					case NET_EPORTNOACCESS:
-						printf("ERROR: NET_EPORTNOACCESS '%s'\n", net_error_str(info->network));
+						fprintf(stderr, "ERROR: NET_EPORTNOACCESS '%s'\n", net_error_str(info->network));
 						break;
 				}
 			}
@@ -93,15 +104,21 @@ private:
 
 extern "C"
 startup_info_t startup(int argc, char **argv) {
-	startup_info_t result = {};
+	startup_info_t result = {0};
 	result.network = net_init();
 
-	QApplication a(argc, argv);
-	StartupWindow w(&result);
-	w.show();
+	QApplication app(argc, argv);
 
-	while (w.isVisible()) {
-		a.processEvents();
+	QString locale = QLocale::system().name();
+	QTranslator translator;
+	translator.load(QString("netcheckers_") + locale);
+	app.installTranslator(&translator);
+
+	StartupWindow win(&result);
+	win.show();
+
+	while (win.isVisible()) {
+		app.processEvents();
 	}
 
 	strcpy(result.assets_path, "assets");

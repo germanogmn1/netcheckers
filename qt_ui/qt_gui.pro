@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT       += core gui
+QT += core gui
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -12,12 +12,14 @@ TARGET = qt
 TEMPLATE = lib
 CONFIG += staticlib
 
-HEADERS  += \
+HEADERS += \
     ../src/startup_qt.cpp \
     ../src/startup.h
 
 SOURCES += \
     ../src/startup_qt.cpp
 
-FORMS    += startupwindow.ui \
+FORMS += startupwindow.ui \
     startuploadingdialog.ui
+
+TRANSLATIONS = netcheckers_pt_BR.ts
