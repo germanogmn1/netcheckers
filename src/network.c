@@ -168,7 +168,7 @@ static int connection_proc(void *data) {
 		hints.ai_family = AF_INET;
 		hints.ai_socktype = SOCK_STREAM;
 		hints.ai_protocol = IPPROTO_TCP;
-		struct addrinfo *info;
+		struct addrinfo *info = 0;
 		int err = getaddrinfo(net->host, net->port, &hints, &info);
 		if (err) {
 			net_error_t net_err = (err == EAI_NONAME) ? NET_EDNSFAIL : NET_EUNKNOWN;

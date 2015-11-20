@@ -6,6 +6,7 @@
 #include <QLocale>
 #include <QTranslator>
 #include <QTextCodec>
+#include <QMessageBox>
 #include <stdio.h>
 
 #include "ui_startupwindow.h"
@@ -74,23 +75,28 @@ private slots:
 				close();
 			} else if (state == NET_ERROR) {
 				info->success = false;
+				QString message = "NO MESSAGE";
 				switch (net_get_error(info->network)) {
 					case NET_ECONNREFUSED:
-						fprintf(stderr, "ERROR: NET_ECONNREFUSED '%s'\n", net_error_str(info->network));
+						message = tr("Connection refused");
 						break;
-					case NET_EUNKNOWN:
-						fprintf(stderr, "ERROR: NET_EUNKNOWN '%s'\n", net_error_str(info->network));
-						break;
-					case NET_ENONE:
-						fprintf(stderr, "ERROR: NET_ENONE '%s'\n", net_error_str(info->network));
+					case NET_EDNSFAIL:
+						message = tr("Host %1 could not be found").arg(info->host);
 						break;
 					case NET_EPORTINUSE:
-						fprintf(stderr, "ERROR: NET_EPORTINUSE '%s'\n", net_error_str(info->network));
+						message = tr("The port %1 is alredy in use").arg(info->port);
 						break;
 					case NET_EPORTNOACCESS:
-						fprintf(stderr, "ERROR: NET_EPORTNOACCESS '%s'\n", net_error_str(info->network));
+						message = tr("No permission to use the port %1").arg(info->port);
+						break;
+					case NET_EUNKNOWN:
+						fprintf(stderr, "%s\n", net_error_str(info->network));
+						message = tr("Unknown error") + QString(":\n\n%1").arg(net_error_str(info->network));
+						break;
+					case NET_ENONE: // should be impossible
 						break;
 				}
+				QMessageBox::critical(this, tr("Failed to connect"), message);
 			}
 		}
 	}
